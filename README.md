@@ -1,5 +1,9 @@
 # redevops-projects
 
+[![License: AGPL-3.0 + Commons Clause](https://img.shields.io/badge/License-AGPL--3.0%20%2B%20Commons%20Clause-blue.svg)](LICENSE) [![NVIDIA Inception](https://img.shields.io/badge/NVIDIA-Inception%20Program%20Member-76B900.svg)](https://www.nvidia.com/en-us/startups/)
+
+> **🚀 NVIDIA Inception Program Member** — ReDevOps is a member of the NVIDIA Inception Program, supporting startups advancing AI and accelerated computing. Membership provides access to NVIDIA technology, technical resources, and the startup ecosystem. It does not imply product endorsement by NVIDIA.
+
 **Projects** — the persistent human workspace over the ReDevOps Runtime stack. Missions,
 Workflows, Attention, Discovery, connected Apps and Activity in one place, with a
 context-aware **Sidekick** (the conversational interface). Projects renders Runtime truth;
