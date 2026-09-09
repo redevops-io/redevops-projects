@@ -28,6 +28,7 @@ export interface MissionSummary extends Provenance {
   workflow: string;
   state: MissionState;
   progress: string; // "4/7", "84%", "Verified"
+  context_used?: string[]; // evidence sources the Mission read (doc §11)
 }
 
 export type WorkflowState = "active" | "scheduled" | "paused";
@@ -91,6 +92,81 @@ export interface ActivityEvent extends Provenance {
   text: string;
 }
 
+// ── Sources — the evidence plane (doc §6). Sources define what evidence is available;
+// Context Runtime decides how to retrieve/represent it. A context grant (what may be read)
+// is separate from an app's capability grant (what actions it may take, doc §14).
+export type SourceKind = "files" | "cloud_files" | "database" | "app_evidence" | "website";
+export type AccessMode = "read_only" | "allow_generated";
+export type IndexingPolicy = "automatic" | "on_demand";
+export type SourceHealthState = "healthy" | "degraded" | "stale" | "error";
+
+export interface SourceHealthInfo {
+  state: SourceHealthState;
+  detail: string;
+  last_observed_at: string;
+}
+
+export interface ContextSource extends Provenance {
+  source_id: string;
+  name: string;
+  kind: SourceKind;
+  provider: string;
+  location: string;
+  access_mode: AccessMode;
+  indexing_policy: IndexingPolicy;
+  refresh_policy: string;
+  exposure_class: string;
+  health: SourceHealthInfo;
+  stats: Record<string, number | string>; // {discovered,indexed,skipped} | {schemas,tables} | {files}
+  allowed_paths: string[];
+  allowed_schemas: string[];
+  allowed_tables: string[];
+  allowed_content_types: string[];
+  denied: string[];
+  last_verified: string;
+  source_fingerprint: string;
+}
+
+// ── Runtime/stack health (doc §17) — the compact "YOUR STACK" card.
+export interface RuntimeUnit { name: string; state: Health; detail: string; }
+export interface RuntimeModel { name: string; role: "primary" | "fallback"; state: Health; }
+export interface RuntimeHealth extends Provenance {
+  runtimes: RuntimeUnit[];
+  models: RuntimeModel[];
+  security: { credential_broker: Health; policy: Health };
+  apps: { name: string; state: Health }[];
+  sources: { name: string; state: Health }[];
+}
+
+// ── Mission templates (doc §16) — preconfigured Missions with per-dependency readiness.
+export interface MissionTemplate {
+  id: string;
+  goal: string;
+  required_capabilities: string[];
+  required_sources: string[];
+  authority_requirements: string[];
+  suggested_workflow: string;
+  readiness: { label: string; ready: boolean }[];
+}
+
+// ── Add-source flow: confirm-first (LLM interprets · human confirms · runtime compiles).
+export interface ProposedSourceSpec {
+  kind: string;
+  location: string;
+  provider: string;
+  access_mode: string;
+  allowed_content_types: string[];
+  allowed_schemas: string[];
+  indexing_policy: string;
+  name: string;
+}
+export interface SourceProposal {
+  project_id: string;
+  sources: ProposedSourceSpec[];
+  assumptions: string[];
+  questions: string[];
+}
+
 export interface ProjectOverview {
   project: ProjectRef;
   attention: AttentionItem[];
@@ -98,6 +174,8 @@ export interface ProjectOverview {
   workflows: WorkflowSummary[];
   discovery: DiscoveryFinding[];
   apps: AppCapability[];
+  sources: ContextSource[];
+  runtime: RuntimeHealth;
 }
 
 // Sidekick context contract — every invocation carries where the user is.

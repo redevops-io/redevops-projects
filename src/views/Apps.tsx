@@ -25,7 +25,21 @@ function statePill(a: AppCapability): { tone: Health; label: string } {
   return { tone: a.health || "ok", label };
 }
 
-function AppCard({ a, onConnect }: { a: AppCapability; onConnect: (provider: string) => void }) {
+// Which apps also provide EVIDENCE (doc §13) — connecting an app as an action provider does
+// NOT imply permission to ingest all its data; the evidence grant lives under Sources.
+const CONTEXT_EVIDENCE: Record<string, string[]> = {
+  hubspot: ["Customer records", "Deal history"],
+  slack: ["Message history"],
+  gmail: ["Email threads"],
+};
+
+// Illustrative context grants (doc §14) — kept separate from capability grants.
+const CONTEXT_GRANTS: Record<string, { allow: string[]; deny: string[] }> = {
+  hubspot: { allow: ["contacts", "support activity"], deny: ["deal financials"] },
+  slack: { allow: ["#support history"], deny: ["DMs"] },
+};
+
+function AppCard({ a, onConnect, onContext }: { a: AppCapability; onConnect: (provider: string) => void; onContext: () => void }) {
   const [open, setOpen] = useState(false);
   const [fields, setFields] = useState<Record<string, string>>({});
   const connected = a.state !== "NOT_CONNECTED";
@@ -50,14 +64,30 @@ function AppCard({ a, onConnect }: { a: AppCapability; onConnect: (provider: str
       {open ? (
         <div className="setup">
           {connected ? (
-            <ul className="steps-trace">
-              {a.capabilities.map((c) => (
-                <li key={c}>
-                  <span className="mk done">✓</span>
-                  <span className="grow mono">{c}</span>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="steps-trace">
+                {a.capabilities.map((c) => (
+                  <li key={c}>
+                    <span className="mk done">✓</span>
+                    <span className="grow mono">{c}</span>
+                  </li>
+                ))}
+              </ul>
+              {CONTEXT_EVIDENCE[a.provider] ? (
+                <div style={{ marginTop: 10 }}>
+                  <div className="eyebrow">Available as context</div>
+                  <div className="row" style={{ flexWrap: "wrap", marginTop: 6 }}>
+                    {CONTEXT_EVIDENCE[a.provider].map((e) => <Pill key={e} tone="mut">{e}</Pill>)}
+                  </div>
+                  <div className="act" style={{ padding: "10px 0 0" }}>
+                    <button className="btn sm" onClick={onContext}>Configure context access</button>
+                  </div>
+                  <div className="s" style={{ marginTop: 6 }}>
+                    Connecting this app as an action provider doesn't grant evidence access — that's a separate grant under Sources.
+                  </div>
+                </div>
+              ) : null}
+            </>
           ) : (
             <>
               <ol className="steps">
@@ -91,7 +121,7 @@ function AppCard({ a, onConnect }: { a: AppCapability; onConnect: (provider: str
   );
 }
 
-export function Apps({ client }: { client: DataClient; go: (s: Section) => void }) {
+export function Apps({ client, go }: { client: DataClient; go: (s: Section) => void }) {
   const [apps, setApps] = useState<AppCapability[] | null>(null);
   const [tab, setTab] = useState<Tab>("connected");
   const [demoStatus, setDemoStatus] = useState<string | null>(null);
@@ -157,7 +187,7 @@ export function Apps({ client }: { client: DataClient; go: (s: Section) => void 
 
       {tab === "connected" ? (
         <div className="apps">
-          {connected.map((a) => <AppCard key={a.provider} a={a} onConnect={connect} />)}
+          {connected.map((a) => <AppCard key={a.provider} a={a} onConnect={connect} onContext={() => go("sources")} />)}
         </div>
       ) : null}
 
@@ -165,7 +195,7 @@ export function Apps({ client }: { client: DataClient; go: (s: Section) => void 
         <div className="apps">
           {available.length === 0
             ? <div className="placeholder">Every discovered app is connected.</div>
-            : available.map((a) => <AppCard key={a.provider} a={a} onConnect={connect} />)}
+            : available.map((a) => <AppCard key={a.provider} a={a} onConnect={connect} onContext={() => go("sources")} />)}
         </div>
       ) : null}
 
@@ -189,17 +219,37 @@ export function Apps({ client }: { client: DataClient; go: (s: Section) => void 
       ) : null}
 
       {tab === "permissions" ? (
-        <div className="card">
-          <div className="hd"><span className="eyebrow">Granted capabilities</span></div>
-          <div className="bd">
-            {apps.flatMap((a) => a.capabilities.map((c) => (
-              <div className="row" key={a.provider + c}>
-                <div className="grow mono">{c}</div>
-                <div className="colw mono">{a.provider}</div>
-              </div>
-            )))}
+        <>
+          <div className="card">
+            <div className="hd"><span className="eyebrow">Capability grants · what each app may do</span></div>
+            <div className="bd">
+              {apps.flatMap((a) => a.capabilities.map((c) => (
+                <div className="row" key={a.provider + c}>
+                  <div className="grow mono">{c}</div>
+                  <div className="colw mono">{a.provider}</div>
+                </div>
+              )))}
+            </div>
           </div>
-        </div>
+          <div className="card">
+            <div className="hd"><span className="eyebrow">Context grants · what each app may be read as evidence</span>
+              <button className="btn sm" style={{ marginLeft: "auto" }} onClick={() => go("sources")}>Open Sources</button></div>
+            <div className="bd">
+              {Object.entries(CONTEXT_GRANTS).map(([provider, g]) => (
+                <div className="row" key={provider}>
+                  <div className="colw mono">{provider}</div>
+                  <div className="grow" style={{ flexWrap: "wrap", display: "flex", gap: 6 }}>
+                    {g.allow.map((x) => <Pill key={x} tone="ok">ALLOW {x}</Pill>)}
+                    {g.deny.map((x) => <Pill key={x} tone="bad">DENY {x}</Pill>)}
+                  </div>
+                </div>
+              ))}
+              <div className="s" style={{ marginTop: 8 }}>
+                Capability grants (actions) and context grants (evidence) are separate — connecting an app never implies ingesting all its data.
+              </div>
+            </div>
+          </div>
+        </>
       ) : null}
 
       <div className="demoflag">Setup cards render the runtime's ProviderSetupGuide — same descriptor, any surface.</div>

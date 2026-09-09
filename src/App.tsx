@@ -6,8 +6,10 @@ import { Sidekick } from "./components/Sidekick";
 import { Overview } from "./views/Overview";
 import { Missions } from "./views/Missions";
 import { Workflows } from "./views/Workflows";
+import { SidekickTab } from "./views/SidekickTab";
 import { Attention } from "./views/Attention";
 import { Discovery } from "./views/Discovery";
+import { Sources } from "./views/Sources";
 import { Apps } from "./views/Apps";
 import { Activity } from "./views/Activity";
 import { Settings } from "./views/Settings";
@@ -15,8 +17,9 @@ import { makeClient, type DataClient } from "./data/client";
 import type { ProjectOverview, SidekickContext } from "./data/types";
 
 const SECTION_LABEL: Record<Section, string> = {
-  overview: "Overview", missions: "Missions", workflows: "Workflows", attention: "Attention",
-  discovery: "Discovery", apps: "Apps", activity: "Activity", settings: "Settings",
+  overview: "Overview", missions: "Missions", workflows: "Workflows", sidekick: "Sidekick",
+  attention: "Attention", discovery: "Discovery", sources: "Sources", apps: "Apps",
+  activity: "Activity", settings: "Settings",
 };
 
 export function App({ client }: { client?: DataClient }) {
@@ -44,8 +47,10 @@ export function App({ client }: { client?: DataClient }) {
           : <section className="content"><div className="placeholder">Loading…</div></section>;
       case "missions": return <Missions client={api} go={setSection} />;
       case "workflows": return <Workflows client={api} go={setSection} />;
+      case "sidekick": return <SidekickTab client={api} go={setSection} ctx={ctx} />;
       case "attention": return <Attention client={api} go={setSection} />;
       case "discovery": return <Discovery client={api} go={setSection} />;
+      case "sources": return <Sources client={api} go={setSection} />;
       case "apps": return <Apps client={api} go={setSection} />;
       case "activity": return <Activity client={api} go={setSection} />;
       case "settings": return <Settings client={api} go={setSection} />;

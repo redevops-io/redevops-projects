@@ -4,8 +4,9 @@
 // verify_setup, and Mission/Attention/Discovery projections). Views depend only on this
 // interface, so the Runtime can evolve without a frontend rewrite.
 import type {
-  ActivityEvent, AppCapability, AttentionItem, DiscoveryFinding, MissionSummary,
-  ProjectOverview, ProjectRef, SidekickContext, SidekickReply, WorkflowSummary,
+  ActivityEvent, AppCapability, AttentionItem, ContextSource, DiscoveryFinding, MissionSummary,
+  MissionTemplate, ProjectOverview, ProjectRef, RuntimeHealth, SidekickContext, SidekickReply,
+  SourceProposal, WorkflowSummary,
 } from "./types";
 import * as mock from "./mock";
 
@@ -17,8 +18,13 @@ export interface DataClient {
   getAttention(projectId: string): Promise<AttentionItem[]>;
   getDiscovery(projectId: string): Promise<DiscoveryFinding[]>;
   getApps(projectId: string): Promise<AppCapability[]>;
+  getSources(projectId: string): Promise<ContextSource[]>;
+  getRuntime(projectId: string): Promise<RuntimeHealth>;
+  getTemplates(projectId: string): Promise<MissionTemplate[]>;
   getActivity(projectId: string): Promise<ActivityEvent[]>;
   askSidekick(ctx: SidekickContext, text: string): Promise<SidekickReply>;
+  proposeSource(projectId: string, text: string): Promise<SourceProposal>;
+  confirmSources(projectId: string, sources: SourceProposal["sources"], confirmedBy: string): Promise<ContextSource[]>;
 }
 
 export class MockDataClient implements DataClient {
@@ -29,8 +35,47 @@ export class MockDataClient implements DataClient {
   async getAttention() { return mock.ATTENTION; }
   async getDiscovery() { return mock.DISCOVERY; }
   async getApps() { return mock.APPS; }
+  async getSources() { return mock.SOURCES; }
+  async getRuntime() { return mock.RUNTIME; }
+  async getTemplates() { return mock.TEMPLATES; }
   async getActivity() { return mock.ACTIVITY; }
   async askSidekick(ctx: SidekickContext, text: string) { return scriptedReply(ctx, text); }
+  async proposeSource(projectId: string, text: string) { return scriptedSourceProposal(projectId, text); }
+  async confirmSources(_projectId: string, sources: SourceProposal["sources"]) {
+    // A mock connect: reflect each proposed source back as a freshly-connected ContextSource.
+    return sources.map((s, i): ContextSource => ({
+      source_id: `new-${i}`, name: s.name || s.location || s.kind, kind: (s.kind as ContextSource["kind"]) || "files",
+      provider: s.provider, location: s.location, access_mode: (s.access_mode as ContextSource["access_mode"]) || "read_only",
+      indexing_policy: (s.indexing_policy as ContextSource["indexing_policy"]) || "automatic", refresh_policy: "on_change",
+      exposure_class: "internal", health: { state: "healthy", detail: "Connected", last_observed_at: "just now" },
+      stats: s.kind === "files" ? { discovered: 12, indexed: 12, skipped: 0 } : {}, allowed_paths: [],
+      allowed_schemas: s.allowed_schemas || [], allowed_tables: [], allowed_content_types: s.allowed_content_types || [],
+      denied: [], last_verified: "just now", source_fingerprint: "mock", source_runtime: "context", source_refs: [`source:new-${i}`],
+    }));
+  }
+}
+
+// A deterministic "use my X as context" interpreter — mirrors the backend propose_sources.
+export function scriptedSourceProposal(projectId: string, text: string): SourceProposal {
+  const t = text.toLowerCase();
+  const sources: SourceProposal["sources"] = [];
+  const assumptions: string[] = [];
+  const questions: string[] = [];
+  const path = text.match(/(~?\/[\w./-]+)/);
+  if (path) {
+    sources.push({ kind: "files", location: path[1], provider: "", access_mode: "read_only", allowed_content_types: [], allowed_schemas: [], indexing_policy: "automatic", name: path[1].split("/").filter(Boolean).pop() ?? path[1] });
+    assumptions.push(`${path[1]} — read-only, automatic indexing, common document types`);
+  }
+  if (t.includes("postgres") || t.includes("database")) {
+    sources.push({ kind: "database", location: "localhost/customer_ops", provider: "postgres", access_mode: "read_only", allowed_content_types: [], allowed_schemas: [], indexing_policy: "automatic", name: "customer_ops" });
+    assumptions.push("localhost/customer_ops — read-only connection");
+    questions.push("Which schemas/tables may be used as context?");
+  }
+  if (t.includes("google drive") || t.includes("gdrive")) {
+    sources.push({ kind: "cloud_files", location: "Google Drive", provider: "google_drive", access_mode: "read_only", allowed_content_types: [], allowed_schemas: [], indexing_policy: "automatic", name: "Google Drive" });
+    assumptions.push("Google Drive — connect via provider OAuth, then pick folders");
+  }
+  return { project_id: projectId, sources, assumptions, questions };
 }
 
 // A deterministic Sidekick stand-in until the real conversational backend is wired. It
@@ -67,13 +112,21 @@ export class HttpDataClient implements DataClient {
   getAttention(id: string) { return this.get<AttentionItem[]>(`/api/projects/${id}/attention`); }
   getDiscovery(id: string) { return this.get<DiscoveryFinding[]>(`/api/projects/${id}/discovery`); }
   getApps(id: string) { return this.get<AppCapability[]>(`/api/projects/${id}/apps`); }
+  getSources(id: string) { return this.get<ContextSource[]>(`/api/projects/${id}/sources`); }
+  getRuntime(id: string) { return this.get<RuntimeHealth>(`/api/projects/${id}/runtime`); }
+  getTemplates(id: string) { return this.get<MissionTemplate[]>(`/api/projects/${id}/templates`); }
   getActivity(id: string) { return this.get<ActivityEvent[]>(`/api/projects/${id}/activity`); }
-  async askSidekick(ctx: SidekickContext, text: string): Promise<SidekickReply> {
-    const r = await fetch(this.base.replace(/\/$/, "") + "/api/sidekick", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ctx, text }),
+  private async post<T>(path: string, body: unknown): Promise<T> {
+    const r = await fetch(this.base.replace(/\/$/, "") + path, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     });
-    if (!r.ok) throw new Error(`Projects API /sidekick → ${r.status}`);
-    return (await r.json()) as SidekickReply;
+    if (!r.ok) throw new Error(`Projects API ${path} → ${r.status}`);
+    return (await r.json()) as T;
+  }
+  askSidekick(ctx: SidekickContext, text: string) { return this.post<SidekickReply>("/api/sidekick", { ctx, text }); }
+  proposeSource(projectId: string, text: string) { return this.post<SourceProposal>("/api/sources/propose", { project_id: projectId, text }); }
+  confirmSources(projectId: string, sources: SourceProposal["sources"], confirmedBy: string) {
+    return this.post<ContextSource[]>("/api/sources/confirm", { project_id: projectId, sources, confirmed_by: confirmedBy });
   }
 }
 

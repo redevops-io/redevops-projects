@@ -1,8 +1,9 @@
 import { Pill } from "../components/Pill";
 import type { Section } from "../components/Rail";
-import type { ProjectOverview, WorkflowState } from "../data/types";
+import type { Health, ProjectOverview, SourceHealthState, WorkflowState } from "../data/types";
 
 const WF_TONE: Record<WorkflowState, "run" | "mut"> = { active: "run", scheduled: "run", paused: "mut" };
+const SRC_TONE: Record<SourceHealthState, Health> = { healthy: "ok", degraded: "warn", stale: "warn", error: "bad" };
 
 export function Overview({ data, go }: { data: ProjectOverview; go: (s: Section) => void }) {
   return (
@@ -76,7 +77,43 @@ export function Overview({ data, go }: { data: ProjectOverview; go: (s: Section)
         </div>
       </div>
 
-      <div className="demoflag">Overview composes projections across Missions · Workflows · Discovery · Apps — example data via the mock Projects API client.</div>
+      <div className="card">
+        <div className="hd"><span className="eyebrow">Context sources</span><button className="btn sm" style={{ marginLeft: "auto" }} onClick={() => go("sources")}>Manage</button></div>
+        <div className="bd">
+          {data.sources.map((s) => (
+            <div className="row" key={s.source_id}>
+              <div className="grow"><div className="t">{s.name}</div><div className="s">{s.location}</div></div>
+              <Pill tone={SRC_TONE[s.health.state]}>{s.health.detail}</Pill>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="hd"><span className="eyebrow">Your stack</span></div>
+        <div className="bd">
+          <div className="stackgrid">
+            <div>
+              <div className="eyebrow">Apps</div>
+              {data.runtime.apps.map((a) => <div className="row" key={a.name}><span className="grow t">{a.name}</span><Pill tone={a.state}>{a.state === "ok" ? "Connected" : a.state === "warn" ? "Attention" : "—"}</Pill></div>)}
+            </div>
+            <div>
+              <div className="eyebrow">Context</div>
+              {data.runtime.sources.map((s) => <div className="row" key={s.name}><span className="grow t">{s.name}</span><Pill tone={s.state}>{s.state === "ok" ? "Ready" : "Stale"}</Pill></div>)}
+            </div>
+            <div>
+              <div className="eyebrow">Models</div>
+              {data.runtime.models.map((m) => <div className="row" key={m.name}><span className="grow t">{m.name}</span><Pill tone={m.state}>{m.role === "primary" ? "Primary" : "Fallback"}</Pill></div>)}
+            </div>
+            <div>
+              <div className="eyebrow">Runtimes</div>
+              {data.runtime.runtimes.map((r) => <div className="row" key={r.name}><span className="grow t">{r.name}</span><Pill tone={r.state}>{r.detail}</Pill></div>)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="demoflag">Overview composes projections across Missions · Workflows · Discovery · Apps · Sources · Runtime health — example data via the mock Projects API client.</div>
     </section>
   );
 }

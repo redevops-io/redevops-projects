@@ -10,7 +10,7 @@ const STATE_PILL: Record<WorkflowState, { tone: "run" | "mut"; label: string }> 
   paused: { tone: "mut", label: "Paused" },
 };
 
-const DETAIL_TABS = ["Overview", "Steps", "Apps", "Policy", "Schedule", "Runs"] as const;
+const DETAIL_TABS = ["Overview", "Steps", "Apps", "Sources", "Policy", "Schedule", "Runs"] as const;
 
 // A logical step list rendered as a flowline of nodes joined by arrows. The nodes are the
 // logical intent; the Mission plan resolves them to physical providers at run time.
@@ -37,7 +37,14 @@ const APP_PILLS: { name: string; tone: "ok" | "run" }[] = [
   { name: "WhatsApp", tone: "run" },
   { name: "HubSpot", tone: "ok" },
   { name: "Slack", tone: "ok" },
-  { name: "Stripe", tone: "ok" },
+  { name: "Polar", tone: "ok" },
+];
+
+// Evidence this pattern reads (doc §15). apps = actions · sources = evidence.
+const SOURCE_PILLS: { name: string; tone: "ok" | "warn" }[] = [
+  { name: "Customer policy docs", tone: "ok" },
+  { name: "HubSpot customer history", tone: "ok" },
+  { name: "Support Postgres", tone: "ok" },
 ];
 
 export function Workflows({ client }: { client: DataClient; go: (s: Section) => void }) {
@@ -123,6 +130,20 @@ export function Workflows({ client }: { client: DataClient; go: (s: Section) => 
                 {APP_PILLS.map((a) => <Pill key={a.name} tone={a.tone}>{a.name}</Pill>)}
               </div>
               <div className="s" style={{ marginTop: 8 }}>Illustrative — the planner recruits providers by capability.</div>
+            </div>
+          </div>
+        )}
+
+        {tab === "Sources" && (
+          <div className="card">
+            <div className="hd"><span className="eyebrow">Evidence this workflow reads</span></div>
+            <div className="bd">
+              <div className="row" style={{ flexWrap: "wrap" }}>
+                {SOURCE_PILLS.map((s) => <Pill key={s.name} tone={s.tone}>{s.name}</Pill>)}
+              </div>
+              <div className="s" style={{ marginTop: 8 }}>
+                Apps are the actions this pattern can take; sources are the evidence it may read. Both are governed separately.
+              </div>
             </div>
           </div>
         )}

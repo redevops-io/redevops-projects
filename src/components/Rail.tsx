@@ -1,15 +1,19 @@
 export type Section =
-  | "overview" | "missions" | "workflows" | "attention"
-  | "discovery" | "apps" | "activity" | "settings";
+  | "overview" | "missions" | "workflows" | "sidekick" | "attention"
+  | "discovery" | "sources" | "apps" | "activity" | "settings";
 
 const GROUPS: { group: string; items: { id: Section; icon: string; label: string; badge?: number }[] }[] = [
   { group: "WORK", items: [
     { id: "overview", icon: "▦", label: "Overview" },
     { id: "missions", icon: "◈", label: "Missions" },
     { id: "workflows", icon: "⟲", label: "Workflows" },
+    { id: "sidekick", icon: "✧", label: "Sidekick" },
     { id: "attention", icon: "◉", label: "Attention", badge: 3 },
   ] },
-  { group: "KNOWLEDGE", items: [{ id: "discovery", icon: "✦", label: "Discovery", badge: 2 }] },
+  { group: "KNOWLEDGE", items: [
+    { id: "discovery", icon: "✦", label: "Discovery", badge: 2 },
+    { id: "sources", icon: "▤", label: "Sources" },
+  ] },
   { group: "SYSTEM", items: [
     { id: "apps", icon: "⧉", label: "Apps" },
     { id: "activity", icon: "≣", label: "Activity" },
