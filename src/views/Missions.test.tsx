@@ -28,6 +28,21 @@ describe("Missions", () => {
     expect(screen.getByText(/billing\.refund\.execute/)).toBeTruthy();
   });
 
+  it("shows the outreach Mission's provider-UI gate, hero asset, and resumes on activate", async () => {
+    render(<Missions client={new MockDataClient()} go={() => {}} />);
+    await waitFor(() => expect(screen.getByText("Outreach — Tasha at Nutrients.tech")).toBeTruthy());
+    fireEvent.click(screen.getByText("Outreach — Tasha at Nutrients.tech"));
+
+    // the activation boundary is shown as provider-UI-required, and the hero asset renders
+    await waitFor(() => expect(screen.getByText(/PROVIDER_UI_REQUIRED/)).toBeTruthy());
+    expect((screen.getByAltText("Generated hero asset") as HTMLImageElement).getAttribute("src")).toBe("/hero.jpg");
+
+    // a human flips the sequence on → Mission resumes → delivered
+    fireEvent.click(screen.getByRole("button", { name: "Activate in provider UI" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Activate in provider UI" })).toBeNull());
+    expect(screen.getByText(/ExecutionReceipt issued/)).toBeTruthy();
+  });
+
   it("filters by state via the tab row", async () => {
     render(<Missions client={new MockDataClient()} go={() => {}} />);
     await waitFor(() => expect(screen.getByText("Refund Sarah Chen")).toBeTruthy());

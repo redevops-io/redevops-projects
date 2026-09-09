@@ -16,6 +16,8 @@ export const MISSIONS: MissionSummary[] = [
   { id: "vti", title: "Review VTI exposure", workflow: "Portfolio Review", state: "completed", progress: "Verified", ...P("mission") },
   { id: "rel24", title: "Deploy release 2.4", workflow: "Release Workflow", state: "failed", progress: "Verify step", ...P("mission") },
   { id: "prospect", title: "Weekly prospecting", workflow: "Prospecting", state: "scheduled", progress: "—", ...P("mission") },
+  { id: "outreach", title: "Outreach — Tasha at Nutrients.tech", workflow: "Cold Outreach", state: "needs", progress: "5/8",
+    context_used: ["Generated copy", "Generated hero asset"], ...P("mission", "mission:outreach") },
 ];
 
 export const WORKFLOWS: WorkflowSummary[] = [
@@ -121,6 +123,10 @@ export const TEMPLATES: MissionTemplate[] = [
   { id: "reconcile", goal: "Reconcile CRM", required_capabilities: ["crm.contact.upsert", "crm.note.create"],
     required_sources: ["CRM database"], authority_requirements: [], suggested_workflow: "CRM Reconciliation",
     readiness: [{ label: "HubSpot", ready: true }, { label: "CRM database", ready: true }] },
+  { id: "outreach", goal: "Run cold outreach for the agentic-apps stack",
+    required_capabilities: ["generate.copy", "generate.asset", "outreach.sequence.configure", "outreach.enroll"],
+    required_sources: [], authority_requirements: ["Sequence activation is provider-UI-only (a human toggles it on)"],
+    suggested_workflow: "Cold Outreach", readiness: [{ label: "Apollo", ready: true }] },
 ];
 
 export const OVERVIEW: ProjectOverview = {
@@ -131,6 +137,7 @@ export const OVERVIEW: ProjectOverview = {
 // Mission detail — the Used+Why model (mirrors agentic_os projects_api._mission_evidence).
 export function missionDetail(missionId: string): MissionDetail {
   const summary = MISSIONS.find((m) => m.id === missionId) ?? MISSIONS[0];
+  if (missionId === "outreach") return outreachDetail(summary);
   if (missionId !== "4821") return { summary, steps: [], context_used: [], context_plan_note: "" };
   return {
     summary,
@@ -160,3 +167,29 @@ export const APP_ID: Record<string, string> = {
   WhatsApp: "whatsapp_business", HubSpot: "hubspot", Slack: "slack", Polar: "polar",
   Stripe: "stripe", Gmail: "gmail", Apollo: "apollo",
 };
+
+// The outreach Mission detail — mirrors agentic_os projects_api._outreach_evidence.
+function outreachDetail(summary: MissionSummary): MissionDetail {
+  return {
+    summary,
+    steps: [
+      { n: 1, capability: "prepare.outreach", provider: "runtime", tier: 0, status: "done", why: "target Tasha · Nutrients.tech · cold outreach" },
+      { n: 2, capability: "generate.copy", provider: "claude", tier: 0, status: "done", why: "grounded in a nutrition-tech ops example; subject prefixed [test]" },
+      { n: 3, capability: "generate.asset", provider: "fal.ai", tier: 0, status: "done", why: "optional creative asset — multimodal composition" },
+      { n: 4, capability: "outreach.sequence.configure", provider: "apollo", tier: 3, status: "done", why: "built the sequence step + email template (wait_mode day; template endpoint)" },
+      { n: 5, capability: "outreach.enroll", provider: "apollo", tier: 3, status: "done", why: "enrolled tasha@nutrients.tech from the warmed mailbox" },
+      { n: 6, capability: "outreach.sequence.activate", provider: "apollo", tier: 4, status: "waiting", why: "PROVIDER_UI_REQUIRED — Apollo activation is UI-only (capability advertises automatable=false); a human flips the sequence on" },
+      { n: 7, capability: "outreach.observe", provider: "apollo", tier: 1, status: "todo", why: "after activation, observe the send through the mailbox" },
+      { n: 8, capability: "verify.delivery", provider: "apollo", tier: 1, status: "todo", why: "confirm delivery and produce an ExecutionReceipt" },
+    ],
+    context_used: [
+      { source_id: "copy", source_name: "Generated copy", provider: "claude", kind: "artifact", evidence_kind: "file",
+        retrieved: null, identity: { version: "v1" }, refs: [{ ref: "artifact:copy", summary: "[test] One governed system for Nutrients.tech's apps + data" }],
+        why: "synthesized from the goal + target context" },
+      { source_id: "asset", source_name: "Generated hero asset", provider: "fal.ai", kind: "artifact", evidence_kind: "file",
+        retrieved: null, identity: { version: "v1" }, refs: [{ ref: "artifact:hero", summary: "conceptual hero — apps + DB + doc → one governed system" }],
+        preview: "/hero.jpg", why: "optional creative asset (copy is required; asset is not)" },
+    ],
+    context_plan_note: "Logical outreach workflow is provider-independent; activation is a physical capability result — Apollo is provider-UI-only, so the Mission pauses for a human.",
+  };
+}
