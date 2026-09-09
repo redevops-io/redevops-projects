@@ -154,3 +154,9 @@ export function missionDetail(missionId: string): MissionDetail {
     context_plan_note: "Sources define what evidence is available; Context Runtime chose SQL-in-place for the structured customer data and vector retrieval for the policy prose.",
   };
 }
+
+// Human dependency label → provider id, so the UI can act on a readiness label.
+export const APP_ID: Record<string, string> = {
+  WhatsApp: "whatsapp_business", HubSpot: "hubspot", Slack: "slack", Polar: "polar",
+  Stripe: "stripe", Gmail: "gmail", Apollo: "apollo",
+};
