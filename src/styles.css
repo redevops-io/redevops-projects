@@ -137,3 +137,5 @@ ol.steps li{margin:4px 0}
 .finding .links{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .chiplink{font-size:12px;border:1px solid var(--line-2);border-radius:7px;padding:3px 9px;background:var(--panel);color:var(--ink-2);cursor:pointer}
 .chiplink:hover{border-color:var(--accent);color:var(--accent-ink)}
+.stackgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px}
+.stackgrid>div>.eyebrow{margin-bottom:6px}

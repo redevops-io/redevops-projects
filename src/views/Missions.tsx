@@ -100,6 +100,21 @@ export function Missions({ client }: { client: DataClient; go: (s: Section) => v
           </div>
         </div>
 
+        {selected.context_used && selected.context_used.length ? (
+          <div className="card">
+            <div className="hd"><span className="eyebrow">Context used</span>
+              <button className="btn sm" style={{ marginLeft: "auto" }}>View evidence</button></div>
+            <div className="bd">
+              <div className="row" style={{ flexWrap: "wrap" }}>
+                {selected.context_used.map((c) => <Pill key={c} tone="mut">{c}</Pill>)}
+              </div>
+              <div className="s" style={{ marginTop: 8 }}>
+                Evidence the Context Runtime supplied to this Mission — sources define what's available, the Runtime chose how to retrieve it.
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="card">
           <div className="hd"><span className="eyebrow">Actions</span></div>
           <div className="bd">

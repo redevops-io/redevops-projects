@@ -1,8 +1,8 @@
 // Deterministic sample projections so the app runs standalone (no backend). Clearly
 // example data; the HttpDataClient replaces it with real Runtime projections.
 import type {
-  ActivityEvent, AppCapability, AttentionItem, DiscoveryFinding, MissionSummary,
-  ProjectOverview, ProjectRef, WorkflowSummary,
+  ActivityEvent, AppCapability, AttentionItem, ContextSource, DiscoveryFinding, MissionSummary,
+  MissionTemplate, ProjectOverview, ProjectRef, RuntimeHealth, WorkflowSummary,
 } from "./types";
 
 export const PROJECT: ProjectRef = { id: "customer-ops", name: "Customer Operations", health: "ok" };
@@ -10,7 +10,8 @@ export const PROJECT: ProjectRef = { id: "customer-ops", name: "Customer Operati
 const P = (rt: any, ...refs: string[]) => ({ source_runtime: rt, source_refs: refs });
 
 export const MISSIONS: MissionSummary[] = [
-  { id: "4821", title: "Refund Sarah Chen", workflow: "Customer Refunds", state: "needs", progress: "4/7", ...P("mission", "mission:4821") },
+  { id: "4821", title: "Refund Sarah Chen", workflow: "Customer Refunds", state: "needs", progress: "4/7",
+    context_used: ["HubSpot customer record", "Support Postgres", "WhatsApp conversation", "Refund policy PDF"], ...P("mission", "mission:4821") },
   { id: "triage", title: "Daily support triage", workflow: "Support Triage", state: "running", progress: "84%", ...P("mission") },
   { id: "vti", title: "Review VTI exposure", workflow: "Portfolio Review", state: "completed", progress: "Verified", ...P("mission") },
   { id: "rel24", title: "Deploy release 2.4", workflow: "Release Workflow", state: "failed", progress: "Verify step", ...P("mission") },
@@ -68,6 +69,61 @@ export const ACTIVITY: ActivityEvent[] = [
   { id: "e6", time: "18:24", text: "Workflow policy updated · Customer Refund Handling", ...P("project") },
 ];
 
+const src = (o: Partial<ContextSource> & Pick<ContextSource, "source_id" | "name" | "kind" | "location" | "health">): ContextSource => ({
+  provider: "", access_mode: "read_only", indexing_policy: "automatic", refresh_policy: "on_change",
+  exposure_class: "internal", stats: {}, allowed_paths: [], allowed_schemas: [], allowed_tables: [],
+  allowed_content_types: [], denied: [], last_verified: "", source_fingerprint: "",
+  source_runtime: "context", source_refs: [`source:${o.source_id}`], ...o,
+});
+
+export const SOURCES: ContextSource[] = [
+  src({ source_id: "pdfs", name: "Customer policy docs", kind: "files", location: "~/company-docs",
+    health: { state: "healthy", detail: "391 indexed", last_observed_at: "2 min ago" },
+    stats: { discovered: 428, indexed: 391, skipped: 37 }, allowed_content_types: ["pdf", "docx", "markdown"],
+    last_verified: "2 min ago", source_fingerprint: "a1b2c3" }),
+  src({ source_id: "crm", name: "CRM database", kind: "database", provider: "postgres",
+    location: "postgres · localhost/customer_ops", health: { state: "healthy", detail: "Live connection", last_observed_at: "live" },
+    stats: { schemas: 2, tables: 42 }, allowed_schemas: ["public", "support"], denied: ["billing.card_data", "hr.*"] }),
+  src({ source_id: "gdrive", name: "Google Drive", kind: "cloud_files", provider: "google_drive", location: "Drive · Policies",
+    health: { state: "healthy", detail: "Synced 4 min ago", last_observed_at: "4 min ago" }, stats: { files: 1842, indexed: 1842 } }),
+  src({ source_id: "s3", name: "Support archive", kind: "cloud_files", provider: "s3", location: "s3://support-archive",
+    health: { state: "stale", detail: "Credentials expired · last sync 2 days ago", last_observed_at: "2 days ago" }, stats: { files: 12045 } }),
+];
+
+export const RUNTIME: RuntimeHealth = {
+  runtimes: [
+    { name: "Mission Runtime", state: "ok", detail: "Healthy" },
+    { name: "Context Runtime", state: "ok", detail: "Healthy" },
+    { name: "Discovery Runtime", state: "ok", detail: "Healthy" },
+  ],
+  models: [
+    { name: "Local model", role: "primary", state: "ok" },
+    { name: "Cloud fallback", role: "fallback", state: "mut" },
+  ],
+  security: { credential_broker: "ok", policy: "ok" },
+  apps: [{ name: "WhatsApp", state: "warn" }, { name: "HubSpot", state: "ok" }, { name: "Slack", state: "ok" }, { name: "Polar", state: "ok" }],
+  sources: [{ name: "Customer PDFs", state: "ok" }, { name: "CRM Postgres", state: "ok" }, { name: "Google Drive", state: "ok" }, { name: "S3 archive", state: "warn" }],
+  ...P("project", "runtime:health"),
+};
+
+export const TEMPLATES: MissionTemplate[] = [
+  { id: "refunds", goal: "Handle customer refunds",
+    required_capabilities: ["chat.message.send", "crm.contact.upsert", "approval.request", "billing.refund.execute"],
+    required_sources: ["Customer policy docs", "CRM database"], authority_requirements: ["Approval required before refund"],
+    suggested_workflow: "Customer Refund Handling",
+    readiness: [{ label: "WhatsApp", ready: true }, { label: "HubSpot", ready: true }, { label: "Slack", ready: true }, { label: "Polar", ready: true }, { label: "Customer policy docs", ready: true }, { label: "CRM database", ready: true }] },
+  { id: "prospect", goal: "Run weekly prospecting", required_capabilities: ["crm.contact.upsert", "email.message.send"],
+    required_sources: ["CRM database"], authority_requirements: [], suggested_workflow: "Weekly Prospecting",
+    readiness: [{ label: "Apollo", ready: true }, { label: "Gmail", ready: false }, { label: "HubSpot", ready: true }] },
+  { id: "triage", goal: "Review support queue", required_capabilities: ["chat.message.read", "crm.contact.upsert"],
+    required_sources: ["Support Postgres"], authority_requirements: [], suggested_workflow: "Daily Support Triage",
+    readiness: [{ label: "Slack", ready: true }, { label: "HubSpot", ready: true }, { label: "Support Postgres", ready: true }] },
+  { id: "reconcile", goal: "Reconcile CRM", required_capabilities: ["crm.contact.upsert", "crm.note.create"],
+    required_sources: ["CRM database"], authority_requirements: [], suggested_workflow: "CRM Reconciliation",
+    readiness: [{ label: "HubSpot", ready: true }, { label: "CRM database", ready: true }] },
+];
+
 export const OVERVIEW: ProjectOverview = {
-  project: PROJECT, attention: ATTENTION, missions: MISSIONS, workflows: WORKFLOWS, discovery: DISCOVERY, apps: APPS,
+  project: PROJECT, attention: ATTENTION, missions: MISSIONS, workflows: WORKFLOWS, discovery: DISCOVERY,
+  apps: APPS, sources: SOURCES, runtime: RUNTIME,
 };
