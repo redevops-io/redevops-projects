@@ -1,8 +1,8 @@
 // Deterministic sample projections so the app runs standalone (no backend). Clearly
 // example data; the HttpDataClient replaces it with real Runtime projections.
 import type {
-  ActivityEvent, AppCapability, AttentionItem, ContextSource, DiscoveryFinding, MissionSummary,
-  MissionTemplate, ProjectOverview, ProjectRef, RuntimeHealth, WorkflowSummary,
+  ActivityEvent, AppCapability, AttentionItem, ContextSource, DiscoveryFinding, MissionDetail,
+  MissionSummary, MissionTemplate, ProjectOverview, ProjectRef, RuntimeHealth, WorkflowSummary,
 } from "./types";
 
 export const PROJECT: ProjectRef = { id: "customer-ops", name: "Customer Operations", health: "ok" };
@@ -127,3 +127,30 @@ export const OVERVIEW: ProjectOverview = {
   project: PROJECT, attention: ATTENTION, missions: MISSIONS, workflows: WORKFLOWS, discovery: DISCOVERY,
   apps: APPS, sources: SOURCES, runtime: RUNTIME,
 };
+
+// Mission detail — the Used+Why model (mirrors agentic_os projects_api._mission_evidence).
+export function missionDetail(missionId: string): MissionDetail {
+  const summary = MISSIONS.find((m) => m.id === missionId) ?? MISSIONS[0];
+  if (missionId !== "4821") return { summary, steps: [], context_used: [], context_plan_note: "" };
+  return {
+    summary,
+    steps: [
+      { n: 1, capability: "chat.message.read", provider: "whatsapp_business", tier: 2, status: "done", why: "inbound channel the request arrived on" },
+      { n: 2, capability: "crm.contact.upsert", provider: "hubspot", tier: 2, status: "done", why: "named CRM; only connected contact store" },
+      { n: 3, capability: "billing.order.find", provider: "polar", tier: 1, status: "done", why: "billing provider of record for this account" },
+      { n: 4, capability: "approval.request", provider: "slack", tier: 3, status: "waiting", why: "policy requires human approval before a refund" },
+      { n: 5, capability: "billing.refund.execute", provider: "polar", tier: 4, status: "todo", why: "moves money — runs only after approval, then verified" },
+    ],
+    context_used: [
+      { source_id: "crm", source_name: "CRM database", provider: "postgres", kind: "database", evidence_kind: "query",
+        retrieved: { count: 3, observed_at: "2026-09-09T11:31:00Z" }, identity: null,
+        refs: [{ ref: "postgres:customers#0", summary: "id=8821 · email=sarah@…" }, { ref: "postgres:support.tickets#0", summary: "subject=Billed twice · status=open" }],
+        why: "scoped SQL against the live source — queried in place rather than ingesting the DB" },
+      { source_id: "pdfs", source_name: "Refund Policies", provider: "google_drive", kind: "cloud_files", evidence_kind: "file",
+        retrieved: null, identity: { fingerprint: "a1b2c3", version: "v19" },
+        refs: [{ ref: "gdrive:f1", summary: "Refund Policy.pdf" }],
+        why: "vector retrieval over indexed policy PDFs — the right representation for prose" },
+    ],
+    context_plan_note: "Sources define what evidence is available; Context Runtime chose SQL-in-place for the structured customer data and vector retrieval for the policy prose.",
+  };
+}
