@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "demo:record": "node e2e/record-outreach-demo.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -21,6 +22,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "jsdom": "^25.0.1",
+    "playwright": "^1.63.0",
     "typescript": "^5.5.4",
     "vite": "^5.4.8",
     "vitest": "^2.1.1"
