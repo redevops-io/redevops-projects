@@ -191,3 +191,32 @@ export interface SidekickReply {
   text: string;
   actions?: { label: string; kind: string }[];
 }
+
+// ── Mission detail: the Used+Why half of the Available/Used/Why symmetry (doc). Actions =
+// the steps run + why; Evidence = context used, distinguishing QUERY evidence (records
+// retrieved live) from CATALOG/FILE evidence (identity fingerprint/version).
+export interface MissionStep {
+  n: number;
+  capability: string;
+  provider: string;
+  tier: number;
+  status: "done" | "waiting" | "todo";
+  why: string;
+}
+export interface EvidenceItem {
+  source_id: string;
+  source_name: string;
+  provider: string;
+  kind: string;
+  evidence_kind: "query" | "catalog" | "file";
+  retrieved: { count: number; observed_at: string } | null;
+  identity: { fingerprint?: string; version?: string } | null;
+  refs: { ref: string; summary: string }[];
+  why: string;
+}
+export interface MissionDetail {
+  summary: MissionSummary;
+  steps: MissionStep[];
+  context_used: EvidenceItem[];
+  context_plan_note: string;
+}

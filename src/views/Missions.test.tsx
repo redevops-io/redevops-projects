@@ -15,6 +15,19 @@ describe("Missions", () => {
     expect(screen.getByText("Approve")).toBeTruthy();
   });
 
+  it("renders query vs file evidence with the Context-Plan why on the detail", async () => {
+    render(<Missions client={new MockDataClient()} go={() => {}} />);
+    await waitFor(() => expect(screen.getByText("Refund Sarah Chen")).toBeTruthy());
+    fireEvent.click(screen.getByText("Refund Sarah Chen"));
+
+    // query evidence shows records-retrieved (not just "Postgres ✓"); file evidence its version
+    await waitFor(() => expect(screen.getByText(/3 records retrieved/)).toBeTruthy());
+    expect(screen.getByText(/Refund Policy\.pdf/)).toBeTruthy();
+    // the "why" (Context Plan) is surfaced, and an action carries its provider
+    expect(screen.getByText(/scoped SQL against the live source/)).toBeTruthy();
+    expect(screen.getByText(/billing\.refund\.execute/)).toBeTruthy();
+  });
+
   it("filters by state via the tab row", async () => {
     render(<Missions client={new MockDataClient()} go={() => {}} />);
     await waitFor(() => expect(screen.getByText("Refund Sarah Chen")).toBeTruthy());

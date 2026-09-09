@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import { Pill } from "../components/Pill";
-import type { MissionSummary, MissionState } from "../data/types";
+import type { EvidenceItem, MissionDetail, MissionState, MissionSummary } from "../data/types";
+
+function fmtTime(iso: string): string {
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? iso : d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
 
 type Filter = "all" | MissionState;
 
@@ -53,10 +58,16 @@ export function Missions({ client }: { client: DataClient; go: (s: Section) => v
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [detail, setDetail] = useState<MissionDetail | null>(null);
 
   useEffect(() => {
     client.getMissions("customer-ops").then(setMissions);
   }, [client]);
+
+  useEffect(() => {
+    if (selectedId) client.getMissionDetail("customer-ops", selectedId).then(setDetail);
+    else setDetail(null);
+  }, [client, selectedId]);
 
   if (!missions) {
     return (
@@ -100,17 +111,51 @@ export function Missions({ client }: { client: DataClient; go: (s: Section) => v
           </div>
         </div>
 
-        {selected.context_used && selected.context_used.length ? (
+        {detail && detail.steps.length ? (
           <div className="card">
-            <div className="hd"><span className="eyebrow">Context used</span>
-              <button className="btn sm" style={{ marginLeft: "auto" }}>View evidence</button></div>
+            <div className="hd"><span className="eyebrow">Actions · what ran and why</span></div>
             <div className="bd">
-              <div className="row" style={{ flexWrap: "wrap" }}>
-                {selected.context_used.map((c) => <Pill key={c} tone="mut">{c}</Pill>)}
-              </div>
-              <div className="s" style={{ marginTop: 8 }}>
-                Evidence the Context Runtime supplied to this Mission — sources define what's available, the Runtime chose how to retrieve it.
-              </div>
+              <ul className="steps-trace">
+                {detail.steps.map((s) => (
+                  <li key={s.n} style={{ alignItems: "flex-start" }}>
+                    <span className={`mk ${s.status === "done" ? "done" : s.status === "waiting" ? "now" : "todo"}`}>
+                      {s.status === "done" ? "✓" : s.status === "waiting" ? "●" : "○"}</span>
+                    <span className="grow">
+                      <span className="mono">{s.capability}</span> → {s.provider}
+                      <div className="s">{s.why}</div>
+                    </span>
+                    {s.tier >= 4 ? <Pill tone="warn">tier {s.tier}</Pill> : null}
+                  </li>
+                ))}
+              </ul>
+              <div className="s" style={{ marginTop: 6 }}>Available: see <b>Apps</b>. Used above; the “why” is the EXPLAIN.</div>
+            </div>
+          </div>
+        ) : null}
+
+        {detail && detail.context_used.length ? (
+          <div className="card">
+            <div className="hd"><span className="eyebrow">Context used · evidence &amp; why</span></div>
+            <div className="bd">
+              {detail.context_used.map((e: EvidenceItem) => (
+                <div className="row" key={e.source_id} style={{ alignItems: "flex-start" }}>
+                  <div className="grow">
+                    <div className="t">{e.source_name} <span className="s">· {e.provider}</span></div>
+                    <div className="s">
+                      {e.evidence_kind === "query" && e.retrieved
+                        ? `${e.retrieved.count} records retrieved · observed ${fmtTime(e.retrieved.observed_at)}`
+                        : e.identity
+                        ? `${e.refs[0]?.summary ?? "file"}${e.identity.version ? " · " + e.identity.version : ""}${e.identity.fingerprint ? " · " + e.identity.fingerprint : ""}`
+                        : "evidence"}
+                    </div>
+                    <div className="s" style={{ marginTop: 4, opacity: 0.85 }}>Why: {e.why}</div>
+                  </div>
+                  <Pill tone={e.evidence_kind === "query" ? "run" : "mut"}>{e.evidence_kind}</Pill>
+                  <button className="btn sm">Inspect</button>
+                </div>
+              ))}
+              <div className="s" style={{ marginTop: 8 }}>{detail.context_plan_note}</div>
+              <div className="s" style={{ marginTop: 4 }}>Available: see <b>Sources</b>. Used above; the “why” is the Context Plan.</div>
             </div>
           </div>
         ) : null}

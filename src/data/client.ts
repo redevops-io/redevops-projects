@@ -5,8 +5,8 @@
 // interface, so the Runtime can evolve without a frontend rewrite.
 import type {
   ActivityEvent, AppCapability, AttentionItem, ContextSource, DiscoveryFinding, MissionSummary,
-  MissionTemplate, ProjectOverview, ProjectRef, RuntimeHealth, SidekickContext, SidekickReply,
-  SourceProposal, WorkflowSummary,
+  MissionDetail, MissionTemplate, ProjectOverview, ProjectRef, RuntimeHealth, SidekickContext,
+  SidekickReply, SourceProposal, WorkflowSummary,
 } from "./types";
 import * as mock from "./mock";
 
@@ -14,6 +14,7 @@ export interface DataClient {
   listProjects(): Promise<ProjectRef[]>;
   getOverview(projectId: string): Promise<ProjectOverview>;
   getMissions(projectId: string): Promise<MissionSummary[]>;
+  getMissionDetail(projectId: string, missionId: string): Promise<MissionDetail>;
   getWorkflows(projectId: string): Promise<WorkflowSummary[]>;
   getAttention(projectId: string): Promise<AttentionItem[]>;
   getDiscovery(projectId: string): Promise<DiscoveryFinding[]>;
@@ -31,6 +32,7 @@ export class MockDataClient implements DataClient {
   async listProjects() { return [mock.PROJECT]; }
   async getOverview() { return mock.OVERVIEW; }
   async getMissions() { return mock.MISSIONS; }
+  async getMissionDetail(_p: string, missionId: string) { return mock.missionDetail(missionId); }
   async getWorkflows() { return mock.WORKFLOWS; }
   async getAttention() { return mock.ATTENTION; }
   async getDiscovery() { return mock.DISCOVERY; }
@@ -108,6 +110,7 @@ export class HttpDataClient implements DataClient {
   listProjects() { return this.get<ProjectRef[]>("/api/projects"); }
   getOverview(id: string) { return this.get<ProjectOverview>(`/api/projects/${id}/overview`); }
   getMissions(id: string) { return this.get<MissionSummary[]>(`/api/projects/${id}/missions`); }
+  getMissionDetail(id: string, mid: string) { return this.get<MissionDetail>(`/api/projects/${id}/missions/${mid}`); }
   getWorkflows(id: string) { return this.get<WorkflowSummary[]>(`/api/projects/${id}/workflows`); }
   getAttention(id: string) { return this.get<AttentionItem[]>(`/api/projects/${id}/attention`); }
   getDiscovery(id: string) { return this.get<DiscoveryFinding[]>(`/api/projects/${id}/discovery`); }
