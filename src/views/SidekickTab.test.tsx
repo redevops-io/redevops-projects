@@ -32,6 +32,17 @@ describe("SidekickTab (doc §2)", () => {
     await waitFor(() => expect(screen.getByText(/Added/)).toBeTruthy());
   });
 
+  it("connects a missing dependency and readiness updates", async () => {
+    render(<SidekickTab client={new MockDataClient()} go={() => {}} ctx={CTX} />);
+    fireEvent.click(screen.getByRole("button", { name: "Mission templates" }));
+
+    const connectGmail = await screen.findByRole("button", { name: "Connect Gmail" });
+    fireEvent.click(connectGmail);
+
+    // After connecting, readiness updates: the Gmail Connect button is gone (now ready).
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Connect Gmail" })).toBeNull());
+  });
+
   it("sends a chat message and renders the scripted reply", async () => {
     render(<SidekickTab client={new MockDataClient()} go={() => {}} ctx={CTX} />);
 
