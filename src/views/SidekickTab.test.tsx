@@ -19,6 +19,19 @@ describe("SidekickTab (doc §2)", () => {
     expect(screen.getByRole("button", { name: "Connect Gmail" })).toBeTruthy();
   });
 
+  it("adds a source conversationally — 'use my files as context' → propose → confirm", async () => {
+    render(<SidekickTab client={new MockDataClient()} go={() => {}} ctx={CTX} />);
+    const box = screen.getByLabelText("Ask Sidekick");
+    fireEvent.change(box, { target: { value: "use the files in ~/contracts as context" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    // Sidekick proposes the source (confirm-first) and, with no open questions, offers to connect.
+    const confirm = await screen.findByRole("button", { name: /Looks right/ });
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(screen.getByText(/Added/)).toBeTruthy());
+  });
+
   it("connects a missing dependency and readiness updates", async () => {
     render(<SidekickTab client={new MockDataClient()} go={() => {}} ctx={CTX} />);
     fireEvent.click(screen.getByRole("button", { name: "Mission templates" }));

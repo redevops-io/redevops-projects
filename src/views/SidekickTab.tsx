@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Section } from "../components/Rail";
 import type { DataClient } from "../data/client";
-import type { MissionTemplate, SidekickContext } from "../data/types";
+import type { MissionTemplate, SidekickContext, SourceProposal } from "../data/types";
 import { APP_ID } from "../data/mock";
 import { Pill } from "../components/Pill";
 
@@ -106,6 +106,7 @@ export function SidekickTab({ client, go, ctx }: { client: DataClient; go: (s: S
     { who: "sk", text: "I carry your current context (shown above), so “this” always means what you're looking at. Describe an outcome — I connect the apps, verify them, and run the work under governance." },
   ]);
   const [input, setInput] = useState("");
+  const [pendingSource, setPendingSource] = useState<SourceProposal | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -114,18 +115,46 @@ export function SidekickTab({ client, go, ctx }: { client: DataClient; go: (s: S
 
   useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight; }, [msgs]);
 
+  // "use my … as context" routes to the confirm-first Source flow (doc §8), not a chat reply.
+  function isSourceIntent(t: string): boolean {
+    const s = t.toLowerCase();
+    return s.includes("as context") ||
+      ((s.includes("use my") || s.includes("use the")) &&
+        /(database|postgres|drive|files|folder|pdfs?)/.test(s));
+  }
+
   async function send(text: string) {
     if (!text.trim()) return;
     setMsgs((m) => [...m, { who: "you", text }]);
     setInput("");
+    if (isSourceIntent(text)) {
+      const prop = await client.proposeSource(ctx.projectId, text);
+      setPendingSource(prop);
+      const lines = prop.sources.map((s) => `${s.kind} · ${s.location}`).join("; ") || "(nothing recognised)";
+      const assume = prop.assumptions.length ? ` Assuming: ${prop.assumptions.join("; ")}.` : "";
+      const ask = prop.questions.length ? ` First: ${prop.questions.join(" ")}` : "";
+      setMsgs((m) => [...m, {
+        who: "sk",
+        text: `I'll add as context — ${lines}.${assume}${ask}`,
+        actions: prop.sources.length && !prop.questions.length ? [{ label: "Looks right — connect", kind: "confirm_source" }] : [],
+      }]);
+      return;
+    }
     const reply = await client.askSidekick(ctx, text);
     setMsgs((m) => [...m, { who: "sk", text: reply.text, actions: reply.actions }]);
   }
 
-  // Reply-action handling mirrors the floating panel: a "setup" action routes to where the
-  // missing pieces are connected; "commit" is a governed no-op stub; anything else echoes.
-  function runAction(a: { label: string; kind: string }) {
+  // Reply-action handling: "setup" routes to where pieces connect; "confirm_source" commits
+  // the confirm-first Source proposal; "commit" is a governed no-op stub; anything else echoes.
+  async function runAction(a: { label: string; kind: string }) {
     if (a.kind === "setup") { go("sources"); return; }
+    if (a.kind === "confirm_source" && pendingSource) {
+      const created = await client.confirmSources(ctx.projectId, pendingSource.sources, "you");
+      const names = created.map((c) => `${c.name} (${c.health.state})`).join(", ");
+      setPendingSource(null);
+      setMsgs((m) => [...m, { who: "sk", text: `✓ Added ${names}. It's on the Sources tab now.` }]);
+      return;
+    }
     setMsgs((m) => [...m, { who: "sk", text: `✓ ${a.label}` }]);
   }
 

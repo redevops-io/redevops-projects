@@ -69,7 +69,9 @@ export class MockDataClient implements DataClient {
       provider: s.provider, location: s.location, access_mode: (s.access_mode as ContextSource["access_mode"]) || "read_only",
       indexing_policy: (s.indexing_policy as ContextSource["indexing_policy"]) || "automatic", refresh_policy: "on_change",
       exposure_class: "internal", health: { state: "healthy", detail: "Connected", last_observed_at: "just now" },
-      stats: s.kind === "files" ? { discovered: 12, indexed: 12, skipped: 0 } : {}, allowed_paths: [],
+      stats: s.kind === "files" ? { discovered: 12, indexed: 12, skipped: 0 }
+        : s.kind === "database" ? { schemas: (s.allowed_schemas || []).length || 2, tables: 42 }
+        : s.kind === "cloud_files" ? { files: 128, indexed: 128 } : {}, allowed_paths: [],
       allowed_schemas: s.allowed_schemas || [], allowed_tables: [], allowed_content_types: s.allowed_content_types || [],
       denied: [], last_verified: "just now", source_fingerprint: "mock", source_runtime: "context", source_refs: [`source:new-${i}`],
     }));
