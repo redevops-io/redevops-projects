@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import { Pill } from "../components/Pill";
-import type { ContextSource, Health, SourceHealthState } from "../data/types";
+import type { ContextSource, Health, SourceHealthState, SourceProposal } from "../data/types";
 
 type Tab = "connected" | "add" | "indexes" | "permissions" | "health";
 
@@ -104,18 +104,24 @@ function AddSource({ client, go, onConnected }: {
   const [access, setAccess] = useState<"read_only" | "allow_generated">("read_only");
   const [indexing, setIndexing] = useState<"automatic" | "on_demand">("automatic");
   const [scanned, setScanned] = useState<ContextSource | null>(null);
+  const [dbHost, setDbHost] = useState("localhost");
+  const [dbName, setDbName] = useState("customer_ops");
+  const [dbSchemas, setDbSchemas] = useState("public, support");
+  const [dbSecured, setDbSecured] = useState(false);
+  const [driveFolder, setDriveFolder] = useState("Refund Policies");
+  const [driveAuthed, setDriveAuthed] = useState(false);
 
-  async function connectAndScan() {
-    const allowed = CONTENT_TYPES.filter((c) => types[c.id]).map((c) => c.id);
-    const [created] = await client.confirmSources(
-      "customer-ops",
-      [{
-        kind: "files", location: path, provider: "", access_mode: access,
-        allowed_content_types: allowed, allowed_schemas: [], indexing_policy: indexing, name: "",
-      }],
-      "you",
-    );
+  async function connectSpec(spec: SourceProposal["sources"][number]) {
+    const [created] = await client.confirmSources("customer-ops", [spec], "you");
     if (created) { setScanned(created); onConnected(created); }
+  }
+
+  function connectAndScan() {
+    const allowed = CONTENT_TYPES.filter((c) => types[c.id]).map((c) => c.id);
+    return connectSpec({
+      kind: "files", location: path, provider: "", access_mode: access,
+      allowed_content_types: allowed, allowed_schemas: [], indexing_policy: indexing, name: "",
+    });
   }
 
   return (
@@ -199,26 +205,66 @@ function AddSource({ client, go, onConnected }: {
 
         {choice === "Database" ? (
           <div className="setup" style={{ borderTop: "1px solid var(--line)", paddingTop: 12, marginTop: 8 }}>
-            <div className="field">
-              <input aria-label="Database type" type="text" value="PostgreSQL" readOnly />
+            <div className="field"><input aria-label="Database type" type="text" value="PostgreSQL" readOnly /></div>
+            <div className="field"><input aria-label="Host" type="text" value={dbHost} onChange={(e) => setDbHost(e.target.value)} /></div>
+            <div className="field"><input aria-label="Database" type="text" value={dbName} onChange={(e) => setDbName(e.target.value)} /></div>
+            <div className="eyebrow" style={{ marginTop: 8 }}>Allowed schemas (read-only)</div>
+            <div className="field"><input aria-label="Allowed schemas" type="text" value={dbSchemas} onChange={(e) => setDbSchemas(e.target.value)} /></div>
+            <div className="lock" style={{ marginTop: 10 }}>
+              🔒 {dbSecured ? "Credential stored in the broker — never shown to the model." : "Connect securely — the credential goes to the broker, resolved at use."}
             </div>
-            <div className="field"><input aria-label="Host" type="text" placeholder="host (e.g. localhost)" /></div>
-            <div className="field"><input aria-label="Database" type="text" placeholder="database" /></div>
-            <div className="scopes">
-              <label className="scope" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                <input type="radio" name="db-access" checked readOnly aria-label="Read only" /> Read only
-              </label>
+            <div className="act" style={{ padding: "12px 0 0", gap: 8 }}>
+              {!dbSecured
+                ? <button className="btn sm" onClick={() => setDbSecured(true)}>Connect securely</button>
+                : <button className="btn pri sm" onClick={() => connectSpec({
+                    kind: "database", provider: "postgres", location: `${dbHost}/${dbName}`,
+                    access_mode: "read_only", allowed_content_types: [],
+                    allowed_schemas: dbSchemas.split(",").map((s) => s.trim()).filter(Boolean),
+                    indexing_policy: "on_demand", name: dbName,
+                  })}>Verify &amp; discover schema</button>}
             </div>
-            <div className="act" style={{ padding: "12px 0 0" }}>
-              <button className="btn sm" onClick={() => { /* verify — stub */ }}>Verify connection</button>
-            </div>
-            <div className="s" style={{ marginTop: 10 }}>Pending — connector not bound (database connectors aren't live yet).</div>
+            {scanned && scanned.kind === "database" ? (
+              <div className="s" style={{ marginTop: 10 }}>
+                {scanned.health.state === "healthy"
+                  ? `Connected read-only: ${statLine(scanned)}.`
+                  : `${scanned.health.state}: ${scanned.health.detail}`}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
-        {choice && choice !== "Local files" && choice !== "Database" ? (
+        {choice === "Cloud drive" ? (
+          <div className="setup" style={{ borderTop: "1px solid var(--line)", paddingTop: 12, marginTop: 8 }}>
+            <div className="s">Google Drive uses provider-native OAuth — no token pasting.</div>
+            <div className="act" style={{ padding: "10px 0", gap: 8 }}>
+              {!driveAuthed
+                ? <button className="btn sm" onClick={() => setDriveAuthed(true)}>Connect Google Drive</button>
+                : <Pill tone="ok">Authorized</Pill>}
+            </div>
+            {driveAuthed ? (
+              <>
+                <div className="eyebrow">Folder</div>
+                <div className="field"><input aria-label="Drive folder" type="text" value={driveFolder} onChange={(e) => setDriveFolder(e.target.value)} /></div>
+                <div className="act" style={{ padding: "12px 0 0" }}>
+                  <button className="btn pri sm" onClick={() => connectSpec({
+                    kind: "cloud_files", provider: "google_drive", location: driveFolder,
+                    access_mode: "read_only", allowed_content_types: [], allowed_schemas: [],
+                    indexing_policy: "automatic", name: driveFolder,
+                  })}>Connect &amp; index</button>
+                </div>
+                {scanned && scanned.kind === "cloud_files" ? (
+                  <div className="s" style={{ marginTop: 10 }}>
+                    {scanned.health.state === "healthy" ? `Indexed: ${statLine(scanned)}.` : `${scanned.health.state}: ${scanned.health.detail}`}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+        ) : null}
+
+        {choice && !["Local files", "Database", "Cloud drive"].includes(choice) ? (
           <div className="placeholder" style={{ marginTop: 10 }}>
-            {choice} — Sidekick will propose the connection. Not wired in this demo.
+            {choice} — ask Sidekick to propose this connection ("use my … as context").
           </div>
         ) : null}
       </div>

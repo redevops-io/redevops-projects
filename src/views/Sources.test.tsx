@@ -20,4 +20,15 @@ describe("Sources view (evidence plane)", () => {
     fireEvent.click(screen.getByText("Local files"));
     await waitFor(() => expect(screen.getByText("Connect & scan")).toBeTruthy());
   });
+
+  it("wires the Database add-source form through connect-securely → discover", async () => {
+    render(<Sources client={new MockDataClient()} go={() => {}} />);
+    fireEvent.click(await screen.findByText("Add source"));
+    fireEvent.click(screen.getByText("Database"));
+    // credential goes to the broker first (no pasting into a shared field)…
+    fireEvent.click(screen.getByRole("button", { name: "Connect securely" }));
+    // …then discovery runs read-only and reports the catalog.
+    fireEvent.click(await screen.findByRole("button", { name: /Verify & discover/ }));
+    await waitFor(() => expect(screen.getByText(/Connected read-only/)).toBeTruthy());
+  });
 });
