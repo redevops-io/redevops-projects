@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Section } from "../components/Rail";
 import type { DataClient } from "../data/client";
 import type { MissionTemplate, SidekickContext } from "../data/types";
+import { APP_ID } from "../data/mock";
 import { Pill } from "../components/Pill";
 
 // The DEDICATED Sidekick tab (doc §2) — a full-page conversational surface, distinct from
@@ -39,7 +40,7 @@ function Chips({ items }: { items: string[] }) {
   return <div>{items.map((c) => <span key={c} style={chipStyle}>{c}</span>)}</div>;
 }
 
-function TemplateCard({ t, go }: { t: MissionTemplate; go: (s: Section) => void }) {
+function TemplateCard({ t, onConnect }: { t: MissionTemplate; onConnect: (label: string) => void }) {
   const [note, setNote] = useState<string | null>(null);
   const notReady = t.readiness.filter((r) => !r.ready);
 
@@ -79,7 +80,7 @@ function TemplateCard({ t, go }: { t: MissionTemplate; go: (s: Section) => void 
               <span className="grow">{r.label}</span>
               {r.ready
                 ? <Pill tone="ok">Ready</Pill>
-                : <button className="btn sm" onClick={() => go("apps")}>Connect {r.label}</button>}
+                : <button className="btn sm" onClick={() => onConnect(r.label)}>Connect {r.label}</button>}
             </li>
           ))}
         </ul>
@@ -126,6 +127,16 @@ export function SidekickTab({ client, go, ctx }: { client: DataClient; go: (s: S
   function runAction(a: { label: string; kind: string }) {
     if (a.kind === "setup") { go("sources"); return; }
     setMsgs((m) => [...m, { who: "sk", text: `✓ ${a.label}` }]);
+  }
+
+  // Connect a template's missing dependency: an app connects via the API (readiness then
+  // updates); a source dependency routes to Add source.
+  async function connectDep(label: string) {
+    const provider = APP_ID[label];
+    if (!provider) { go("sources"); return; }
+    await client.connectApp(provider);
+    setTemplates(await client.getTemplates(ctx.projectId));
+    setMsgs((m) => [...m, { who: "sk", text: `✓ Connected ${label} — the Mission's readiness is updated.` }]);
   }
 
   const objectLine = ctx.objectRef ? <> · Object <b>{ctx.objectRef}</b></> : null;
@@ -187,7 +198,7 @@ export function SidekickTab({ client, go, ctx }: { client: DataClient; go: (s: S
       {tab === "templates" ? (
         !templates
           ? <div className="placeholder">Loading…</div>
-          : <div>{templates.map((t) => <TemplateCard key={t.id} t={t} go={go} />)}</div>
+          : <div>{templates.map((t) => <TemplateCard key={t.id} t={t} onConnect={connectDep} />)}</div>
       ) : null}
 
       {tab === "recent" ? (

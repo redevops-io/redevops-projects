@@ -136,7 +136,8 @@ export function Apps({ client, go }: { client: DataClient; go: (s: Section) => v
 
   // Flip an app to a verified-read state locally, so the demo reflects the connect action
   // without a round trip.
-  function connect(provider: string) {
+  async function connect(provider: string) {
+    await client.connectApp(provider);  // served: hosted OAuth; mock: simulated
     setApps((prev) =>
       (prev ?? []).map((a) =>
         a.provider === provider

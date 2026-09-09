@@ -4,9 +4,9 @@
 // verify_setup, and Mission/Attention/Discovery projections). Views depend only on this
 // interface, so the Runtime can evolve without a frontend rewrite.
 import type {
-  ActivityEvent, AppCapability, AttentionItem, ContextSource, DiscoveryFinding, MissionSummary,
-  MissionDetail, MissionTemplate, ProjectOverview, ProjectRef, RuntimeHealth, SidekickContext,
-  SidekickReply, SourceProposal, WorkflowSummary,
+  ActivityEvent, AppCapability, AttentionItem, ConnectOutcome, ContextSource, DiscoveryFinding,
+  MissionSummary, MissionDetail, MissionTemplate, ProjectOverview, ProjectRef, RuntimeHealth,
+  SidekickContext, SidekickReply, SourceProposal, WorkflowSummary,
 } from "./types";
 import * as mock from "./mock";
 
@@ -26,6 +26,7 @@ export interface DataClient {
   askSidekick(ctx: SidekickContext, text: string): Promise<SidekickReply>;
   proposeSource(projectId: string, text: string): Promise<SourceProposal>;
   confirmSources(projectId: string, sources: SourceProposal["sources"], confirmedBy: string): Promise<ContextSource[]>;
+  connectApp(provider: string): Promise<ConnectOutcome>;
 }
 
 export class MockDataClient implements DataClient {
@@ -36,10 +37,28 @@ export class MockDataClient implements DataClient {
   async getWorkflows() { return mock.WORKFLOWS; }
   async getAttention() { return mock.ATTENTION; }
   async getDiscovery() { return mock.DISCOVERY; }
-  async getApps() { return mock.APPS; }
+  // Live connection set so Connect updates apps + template readiness standalone too.
+  private connected = new Set<string>(["whatsapp_business", "hubspot", "slack", "stripe", "polar"]);
+  async getApps() {
+    return mock.APPS.map((a) => this.connected.has(a.provider)
+      ? { ...a, state: a.state === "NOT_CONNECTED" ? "VERIFIED_READ" as const : a.state, health: "ok" as const }
+      : { ...a, state: "NOT_CONNECTED" as const, health: "mut" as const });
+  }
+  async connectApp(provider: string): Promise<ConnectOutcome> {
+    this.connected.add(provider);
+    return { provider, state: "VERIFIED_READ", connected: true, detail: "connected (mock)" };
+  }
   async getSources() { return mock.SOURCES; }
   async getRuntime() { return mock.RUNTIME; }
-  async getTemplates() { return mock.TEMPLATES; }
+  async getTemplates() {
+    // recompute readiness against the live connection set (app labels map via APP_ID; sources stay ready)
+    return mock.TEMPLATES.map((t) => ({
+      ...t,
+      readiness: t.readiness.map((r) => mock.APP_ID[r.label]
+        ? { ...r, ready: this.connected.has(mock.APP_ID[r.label]) }
+        : r),
+    }));
+  }
   async getActivity() { return mock.ACTIVITY; }
   async askSidekick(ctx: SidekickContext, text: string) { return scriptedReply(ctx, text); }
   async proposeSource(projectId: string, text: string) { return scriptedSourceProposal(projectId, text); }
@@ -131,6 +150,7 @@ export class HttpDataClient implements DataClient {
   confirmSources(projectId: string, sources: SourceProposal["sources"], confirmedBy: string) {
     return this.post<ContextSource[]>("/api/sources/confirm", { project_id: projectId, sources, confirmed_by: confirmedBy });
   }
+  connectApp(provider: string) { return this.post<ConnectOutcome>(`/api/apps/${provider}/connect`, {}); }
 }
 
 // Pick the client from the environment: a Projects API base URL → live; otherwise mock.

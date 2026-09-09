@@ -220,3 +220,14 @@ export interface MissionDetail {
   context_used: EvidenceItem[];
   context_plan_note: string;
 }
+
+// Connect outcome (mirrors agentic_os ConnectOutcome) — what a "Connect <app>" returns.
+export interface ConnectOutcome {
+  provider: string;
+  state: string;
+  connected: boolean;
+  account_ref?: string;
+  scopes?: string[];
+  credential_ref?: string;
+  detail?: string;
+}
