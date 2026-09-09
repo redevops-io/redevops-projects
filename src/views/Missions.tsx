@@ -69,6 +69,19 @@ export function Missions({ client }: { client: DataClient; go: (s: Section) => v
     else setDetail(null);
   }, [client, selectedId]);
 
+  // The provider-UI activation gate: a human flips the sequence on in the provider, and the
+  // Mission resumes — observe → verify → sent. (Mirrors resume_outreach.)
+  function activateSequence() {
+    setDetail((d) => d && ({
+      ...d,
+      steps: d.steps.map((s) =>
+        s.capability === "outreach.sequence.activate" ? { ...s, status: "done", why: "activated by a human in the provider UI" }
+        : s.capability === "outreach.observe" ? { ...s, status: "done", why: "status=active → sent through the warmed mailbox" }
+        : s.capability === "verify.delivery" ? { ...s, status: "done", why: "delivered · ExecutionReceipt issued" }
+        : s),
+    }));
+  }
+
   if (!missions) {
     return (
       <section className="content"><div className="placeholder">Loading…</div></section>
@@ -124,7 +137,9 @@ export function Missions({ client }: { client: DataClient; go: (s: Section) => v
                       <span className="mono">{s.capability}</span> → {s.provider}
                       <div className="s">{s.why}</div>
                     </span>
-                    {s.tier >= 4 ? <Pill tone="warn">tier {s.tier}</Pill> : null}
+                    {s.status === "waiting" && s.capability === "outreach.sequence.activate"
+                      ? <button className="btn sm pri" onClick={activateSequence}>Activate in provider UI</button>
+                      : s.tier >= 4 ? <Pill tone="warn">tier {s.tier}</Pill> : null}
                   </li>
                 ))}
               </ul>
@@ -149,6 +164,10 @@ export function Missions({ client }: { client: DataClient; go: (s: Section) => v
                         : "evidence"}
                     </div>
                     <div className="s" style={{ marginTop: 4, opacity: 0.85 }}>Why: {e.why}</div>
+                    {e.preview ? (
+                      <img src={e.preview} alt={e.source_name}
+                        style={{ marginTop: 10, maxWidth: 360, width: "100%", borderRadius: 10, border: "1px solid var(--line)" }} />
+                    ) : null}
                   </div>
                   <Pill tone={e.evidence_kind === "query" ? "run" : "mut"}>{e.evidence_kind}</Pill>
                   <button className="btn sm">Inspect</button>

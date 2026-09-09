@@ -213,6 +213,7 @@ export interface EvidenceItem {
   identity: { fingerprint?: string; version?: string } | null;
   refs: { ref: string; summary: string }[];
   why: string;
+  preview?: string; // optional image URL for a created visual artifact
 }
 export interface MissionDetail {
   summary: MissionSummary;
