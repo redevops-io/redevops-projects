@@ -4,17 +4,33 @@ import type { SidekickContext } from "../data/types";
 
 interface Msg { who: "you" | "sk"; text: string; actions?: { label: string; kind: string }[]; }
 
-export function Sidekick({ open, ctx, client, onClose }:
-  { open: boolean; ctx: SidekickContext; client: DataClient; onClose: () => void }) {
+// A seed carries a suggested prompt into the panel. `send:false` pre-fills the input and
+// focuses it (the user edits before sending); `send:true` submits immediately so the panel
+// opens straight onto the answer. `nonce` lets the same text re-trigger and is consumed once.
+export interface SidekickSeed { text: string; send: boolean; nonce: number; }
+
+export function Sidekick({ open, ctx, client, onClose, seed }:
+  { open: boolean; ctx: SidekickContext; client: DataClient; onClose: () => void; seed?: SidekickSeed | null }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const bodyRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const consumed = useRef<number>(0);
 
   useEffect(() => {
     if (open && msgs.length === 0) {
       setMsgs([{ who: "sk", text: "I carry your current context (shown above), so “this” always means what you're looking at. Tell me an outcome — I connect the apps, verify them, and run the work." }]);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Consume a seed once per nonce: either submit it (path B — show the answer) or pre-fill and
+  // focus the input (suggested-prompt path A) so the user can edit before sending.
+  useEffect(() => {
+    if (!open || !seed || seed.nonce === consumed.current) return;
+    consumed.current = seed.nonce;
+    if (seed.send) { void send(seed.text); }
+    else { setInput(seed.text); requestAnimationFrame(() => inputRef.current?.focus()); }
+  }, [open, seed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight; }, [msgs]);
 
@@ -54,7 +70,7 @@ export function Sidekick({ open, ctx, client, onClose }:
           ))}
         </div>
         <div className="foot">
-          <input value={input} onChange={(e) => setInput(e.target.value)}
+          <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") send(input); }}
             placeholder="Tell Sidekick what you want done…" />
           <button className="btn pri" onClick={() => send(input)}>Send</button>

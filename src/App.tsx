@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import "./styles.css";
 import { Rail, type Section } from "./components/Rail";
 import { Topbar } from "./components/Topbar";
-import { Sidekick } from "./components/Sidekick";
+import { Sidekick, type SidekickSeed } from "./components/Sidekick";
 import { Overview } from "./views/Overview";
 import { Missions } from "./views/Missions";
 import { Workflows } from "./views/Workflows";
@@ -27,6 +27,14 @@ export function App({ client }: { client?: DataClient }) {
   const [section, setSection] = useState<Section>("overview");
   const [overview, setOverview] = useState<ProjectOverview | null>(null);
   const [skOpen, setSkOpen] = useState(false);
+  const [skSeed, setSkSeed] = useState<SidekickSeed | null>(null);
+
+  // Both entry points converge here. `send:false` (suggested prompts) pre-fills + focuses the
+  // panel input; `send:true` (top-bar submit) opens straight onto the answer.
+  function askSidekick(text: string, send: boolean) {
+    setSkSeed({ text, send, nonce: Date.now() });
+    setSkOpen(true);
+  }
 
   useEffect(() => { api.getOverview("customer-ops").then(setOverview); }, [api]);
   useEffect(() => {
@@ -45,7 +53,7 @@ export function App({ client }: { client?: DataClient }) {
         return overview
           ? <Overview data={overview} go={setSection} />
           : <section className="content"><div className="placeholder">Loading…</div></section>;
-      case "missions": return <Missions client={api} go={setSection} />;
+      case "missions": return <Missions client={api} go={setSection} ask={(t) => askSidekick(t, false)} />;
       case "workflows": return <Workflows client={api} go={setSection} />;
       case "sidekick": return <SidekickTab client={api} go={setSection} ctx={ctx} />;
       case "attention": return <Attention client={api} go={setSection} />;
@@ -61,10 +69,10 @@ export function App({ client }: { client?: DataClient }) {
     <div className="app">
       <Rail section={section} onNavigate={setSection} />
       <div className="main">
-        <Topbar project={overview?.project ?? null} onAsk={() => setSkOpen(true)} />
+        <Topbar project={overview?.project ?? null} onAsk={(t) => askSidekick(t, true)} onOpen={() => setSkOpen(true)} />
         {view()}
       </div>
-      <Sidekick open={skOpen} ctx={ctx} client={api} onClose={() => setSkOpen(false)} />
+      <Sidekick open={skOpen} ctx={ctx} client={api} seed={skSeed} onClose={() => setSkOpen(false)} />
     </div>
   );
 }
