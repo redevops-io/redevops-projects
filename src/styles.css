@@ -86,9 +86,12 @@ h1.h{font-size:22px;margin-top:4px}
 .demoflag{font-size:11.5px;color:var(--muted);text-align:center;padding:4px}
 
 /* sidekick */
-.sk{position:fixed;top:0;right:0;height:100vh;width:388px;max-width:92vw;background:var(--panel);border-left:1px solid var(--line);box-shadow:-8px 0 30px rgba(0,0,0,.14);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s ease;z-index:20}
-.sk.open{transform:none}
-@media(prefers-reduced-motion:reduce){.sk{transition:none}}
+/* Scope the drawer's own box/position rules to the <aside> — a reply bubble is <div class="msg sk">
+   and would otherwise ALSO match a bare `.sk` and inherit fixed/388px/100vh/translateX(100%),
+   rendering every Sidekick answer off-screen. The `.msg.sk` bubble rule below still applies. */
+aside.sk{position:fixed;top:0;right:0;height:100vh;width:388px;max-width:92vw;background:var(--panel);border-left:1px solid var(--line);box-shadow:-8px 0 30px rgba(0,0,0,.14);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s ease;z-index:20}
+aside.sk.open{transform:none}
+@media(prefers-reduced-motion:reduce){aside.sk{transition:none}}
 .sk .hd{display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:1px solid var(--line)}
 .sk .hd .logo{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--accent),#0a6d62);display:grid;place-items:center;color:#fff;font-size:12px}
 .sk .hd .x{margin-left:auto;border:0;background:transparent;color:var(--muted);font-size:18px}
