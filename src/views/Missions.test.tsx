@@ -43,6 +43,21 @@ describe("Missions", () => {
     expect(screen.getByText(/ExecutionReceipt issued/)).toBeTruthy();
   });
 
+  it("routes a suggested Sidekick prompt to the ask() handler with the prompt text", async () => {
+    const asked: string[] = [];
+    render(<Missions client={new MockDataClient()} go={() => {}} ask={(t) => asked.push(t)} />);
+    await waitFor(() => expect(screen.getByText("Refund Sarah Chen")).toBeTruthy());
+    fireEvent.click(screen.getByText("Refund Sarah Chen"));
+
+    await waitFor(() => expect(screen.getByText("Approve")).toBeTruthy());
+    // the top "Ask Sidekick" action button carries a specific question
+    fireEvent.click(screen.getByRole("button", { name: "Ask Sidekick" }));
+    // and a suggested "Ask Sidekick: <question>" link
+    fireEvent.click(screen.getByRole("button", { name: "Ask Sidekick: what happens if I approve this?" }));
+
+    expect(asked).toEqual(["why does this need approval?", "what happens if I approve this?"]);
+  });
+
   it("filters by state via the tab row", async () => {
     render(<Missions client={new MockDataClient()} go={() => {}} />);
     await waitFor(() => expect(screen.getByText("Refund Sarah Chen")).toBeTruthy());

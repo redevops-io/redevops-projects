@@ -52,7 +52,15 @@ function traceFor(m: MissionSummary): Step[] {
   ];
 }
 
-export function Missions({ client }: { client: DataClient; go: (s: Section) => void }) {
+// Suggested things to ask Sidekick from a mission detail. Clicking one opens the side panel
+// with the question pre-filled (see App.askSidekick).
+const SIDEKICK_PROMPTS = [
+  "why does this need approval?",
+  "what happens if I approve this?",
+  "show me the evidence behind this",
+];
+
+export function Missions({ client, ask }: { client: DataClient; go: (s: Section) => void; ask?: (prompt: string) => void }) {
   const [missions, setMissions] = useState<MissionSummary[] | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -185,9 +193,22 @@ export function Missions({ client }: { client: DataClient; go: (s: Section) => v
             <div className="row">
               <button className="btn pri sm" onClick={() => setConfirm("Approved — the refund will execute under a GovernedEnvelope.")}>Approve</button>
               <button className="btn sm" onClick={() => setConfirm("Rejected — no money moves; the customer is notified.")}>Reject</button>
-              <button className="btn sm" onClick={() => setConfirm("Ask Sidekick: why does this need approval?")}>Ask Sidekick</button>
+              <button className="btn sm"
+                onClick={() => ask ? ask("why does this need approval?") : setConfirm("Ask Sidekick: why does this need approval?")}>
+                Ask Sidekick
+              </button>
             </div>
             {confirm ? <div className="s" style={{ marginTop: 8 }}>{confirm}</div> : null}
+
+            <div className="eyebrow" style={{ margin: "12px 0 6px" }}>Ask Sidekick about this</div>
+            <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
+              {SIDEKICK_PROMPTS.map((q) => (
+                <button key={q} className="btn sm"
+                  onClick={() => ask ? ask(q) : setConfirm(`Ask Sidekick: ${q}`)}>
+                  Ask Sidekick: {q}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
