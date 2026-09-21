@@ -1,8 +1,9 @@
 // Deterministic sample projections so the app runs standalone (no backend). Clearly
 // example data; the HttpDataClient replaces it with real Runtime projections.
 import type {
-  ActivityEvent, AppCapability, AttentionItem, ContextSource, DiscoveryFinding, MissionDetail,
-  MissionSummary, MissionTemplate, ProjectOverview, ProjectRef, RuntimeHealth, WorkflowSummary,
+  ActivityEvent, AppCapability, AttentionItem, ContextSource, DeploymentInspection, DiscoveryFinding,
+  MissionDetail, MissionSummary, MissionTemplate, ProjectOverview, ProjectRef, RuntimeHealth,
+  SocialMissionView, WorkflowSummary,
 } from "./types";
 
 export const PROJECT: ProjectRef = { id: "customer-ops", name: "Customer Operations", health: "ok" };
@@ -193,3 +194,72 @@ function outreachDetail(summary: MissionSummary): MissionDetail {
     context_plan_note: "Logical outreach workflow is provider-independent; activation is a physical capability result — Apollo is provider-UI-only, so the Mission pauses for a human.",
   };
 }
+
+// ── External Agent Gateway demo cards (Phase 9) — sample projections for standalone/mock mode.
+export const DEPLOYMENT_INSPECTION: DeploymentInspection = {
+  mission: "Deployment Inspection",
+  target: "https://sentinel.redevops.io",
+  connected: true,
+  boundary: {
+    inspection: "live",
+    remediation: "simulated (governed fake adapter — the live SOC is never mutated)",
+  },
+  kpis: [
+    { label: "Threats blocked", value: "5", note: "active decisions enforced" },
+    { label: "Alerts (24h)", value: "6" },
+    { label: "Source IPs", value: "5" },
+    { label: "Last event", value: "1h ago", note: "crowdsecurity/port-scan" },
+  ],
+  findings: [
+    { source: "network", kind: "broad_policy", severity: "high", detail: "policy 'Default' rule 'Default' allows All→All — over-broad", evidence_ref: "dpev:a1" },
+    { source: "network", kind: "unapproved_peer", severity: "high", detail: "peer 'contractor-vm' is pending approval — unapproved device", evidence_ref: "dpev:a2" },
+    { source: "network", kind: "login_expired", severity: "medium", detail: "peer 'laptop-alex' has an expired login", evidence_ref: "dpev:a3" },
+    { source: "backups", kind: "no_backup", severity: "high", detail: "listmonk (lifecycle) has never been backed up", evidence_ref: "dpev:a4" },
+    { source: "backups", kind: "no_offsite", severity: "medium", detail: "lago (billing) has no offsite copy", evidence_ref: "dpev:a5" },
+    { source: "crowdsec", kind: "active_threats", severity: "medium", detail: "5 active CrowdSec decision(s) enforced against live sources", evidence_ref: "dpev:a6" },
+  ],
+  findings_by_severity: {
+    high: [
+      { source: "network", kind: "broad_policy", severity: "high", detail: "policy 'Default' rule 'Default' allows All→All — over-broad", evidence_ref: "dpev:a1" },
+      { source: "network", kind: "unapproved_peer", severity: "high", detail: "peer 'contractor-vm' is pending approval — unapproved device", evidence_ref: "dpev:a2" },
+      { source: "backups", kind: "no_backup", severity: "high", detail: "listmonk (lifecycle) has never been backed up", evidence_ref: "dpev:a4" },
+    ],
+    medium: [
+      { source: "network", kind: "login_expired", severity: "medium", detail: "peer 'laptop-alex' has an expired login", evidence_ref: "dpev:a3" },
+      { source: "backups", kind: "no_offsite", severity: "medium", detail: "lago (billing) has no offsite copy", evidence_ref: "dpev:a5" },
+      { source: "crowdsec", kind: "active_threats", severity: "medium", detail: "5 active CrowdSec decision(s) enforced against live sources", evidence_ref: "dpev:a6" },
+    ],
+  },
+  finding_count: 6,
+  proposed_actions: ["Open remediation ticket for the top finding", "Track deployment posture", "Draft an operator briefing"],
+  governed_action: {
+    origin: "external-agent",
+    provider: "fake-external-agent",
+    capability: "personal_agent.connected_app_action",
+    goal: "open a remediation ticket: broad_policy — over-broad rule",
+    intent_digest: "sha256:demo…",
+    approval: { required: true, state: "authorized", decision_id: "dec_demo", authorized: true },
+    evidence_refs: ["dpev:a1"],
+    task_state: "succeeded",
+    receipt: { status: "SUCCEEDED", provider_post_id: "fake-external-agent:task:1", receipt_id: "rcpt_demo", decision_id: "dec_demo" },
+    verification: "verified",
+    failed: false,
+  },
+};
+
+export const SOCIAL_INTELLIGENCE: SocialMissionView = {
+  mission: "Social Intelligence",
+  sources: [
+    { source: "Reddit", status: "AVAILABLE / policy-scoped" },
+    { source: "Meta/Muse", status: "UNAVAILABLE — unknown" },
+  ],
+  observations: 6,
+  opportunities: {
+    total: 6, problem_signals: 5, solution_seeking: 4,
+    commercial_intent_evidence: 1, unknown_commercial_intent: 5,
+  },
+  market_signals: 2,
+  proposed_actions: ["Draft response", "Create content mission", "Track topic"],
+  opportunity_cards: [],
+  data_source: "fixture corpus (no live social provider is enabled)",
+};

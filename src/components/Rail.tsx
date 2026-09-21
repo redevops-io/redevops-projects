@@ -1,11 +1,13 @@
 export type Section =
-  | "overview" | "missions" | "workflows" | "sidekick" | "attention"
+  | "overview" | "missions" | "inspection" | "social" | "workflows" | "sidekick" | "attention"
   | "discovery" | "sources" | "apps" | "activity" | "settings";
 
 const GROUPS: { group: string; items: { id: Section; icon: string; label: string; badge?: number }[] }[] = [
   { group: "WORK", items: [
     { id: "overview", icon: "▦", label: "Overview" },
     { id: "missions", icon: "◈", label: "Missions" },
+    { id: "inspection", icon: "⬡", label: "Inspection" },
+    { id: "social", icon: "◎", label: "Social" },
     { id: "workflows", icon: "⟲", label: "Workflows" },
     { id: "sidekick", icon: "✧", label: "Sidekick" },
     { id: "attention", icon: "◉", label: "Attention", badge: 3 },

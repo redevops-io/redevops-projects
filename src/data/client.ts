@@ -4,9 +4,9 @@
 // verify_setup, and Mission/Attention/Discovery projections). Views depend only on this
 // interface, so the Runtime can evolve without a frontend rewrite.
 import type {
-  ActivityEvent, AppCapability, AttentionItem, ConnectOutcome, ContextSource, DiscoveryFinding,
-  MissionSummary, MissionDetail, MissionTemplate, ProjectOverview, ProjectRef, RuntimeHealth,
-  SidekickContext, SidekickReply, SourceProposal, WorkflowSummary,
+  ActivityEvent, AppCapability, AttentionItem, ConnectOutcome, ContextSource, DeploymentInspection,
+  DiscoveryFinding, MissionSummary, MissionDetail, MissionTemplate, ProjectOverview, ProjectRef,
+  RuntimeHealth, SidekickContext, SidekickReply, SocialMissionView, SourceProposal, WorkflowSummary,
 } from "./types";
 import * as mock from "./mock";
 
@@ -23,6 +23,8 @@ export interface DataClient {
   getRuntime(projectId: string): Promise<RuntimeHealth>;
   getTemplates(projectId: string): Promise<MissionTemplate[]>;
   getActivity(projectId: string): Promise<ActivityEvent[]>;
+  getDeploymentInspection(projectId: string): Promise<DeploymentInspection>;
+  getSocialIntelligence(projectId: string): Promise<SocialMissionView>;
   askSidekick(ctx: SidekickContext, text: string): Promise<SidekickReply>;
   proposeSource(projectId: string, text: string): Promise<SourceProposal>;
   confirmSources(projectId: string, sources: SourceProposal["sources"], confirmedBy: string): Promise<ContextSource[]>;
@@ -60,6 +62,8 @@ export class MockDataClient implements DataClient {
     }));
   }
   async getActivity() { return mock.ACTIVITY; }
+  async getDeploymentInspection() { return mock.DEPLOYMENT_INSPECTION; }
+  async getSocialIntelligence() { return mock.SOCIAL_INTELLIGENCE; }
   async askSidekick(ctx: SidekickContext, text: string) { return scriptedReply(ctx, text); }
   async proposeSource(projectId: string, text: string) { return scriptedSourceProposal(projectId, text); }
   async confirmSources(_projectId: string, sources: SourceProposal["sources"]) {
@@ -106,6 +110,16 @@ export function scriptedSourceProposal(projectId: string, text: string): SourceP
 // one must.
 export function scriptedReply(ctx: SidekickContext, text: string): SidekickReply {
   const t = text.toLowerCase();
+  // External Agent Gateway entrances — resolve the goal, hand off via a navigate action (mirrors the
+  // backend sidekick_reply; Sidekick contains no workflow).
+  if ((t.includes("inspect") || t.includes("check") || t.includes("review") || t.includes("audit")) &&
+      (t.includes("deployment") || t.includes("demo") || t.includes("infra"))) {
+    return { text: "Starting 'Inspect current ReDevOps demo deployments' — Edge Sentinel examines the live deployment read-only; any remediation is governed and simulated, so the live SOC is never changed.", actions: [{ label: "Open inspection", kind: "navigate", ref: "inspection" }] };
+  }
+  if (t.includes("social intelligence") || t.includes("market signal") ||
+      ((t.includes("find") || t.includes("discussions")) && (t.includes("social") || t.includes("struggling") || t.includes("reddit")))) {
+    return { text: "Opening Social Intelligence — evidence-backed opportunities from permitted sources, with each provider's real availability (Reddit policy-scoped; Meta/Muse unverified).", actions: [{ label: "Open social intelligence", kind: "navigate", ref: "social" }] };
+  }
   if (t.includes("two approver") || t.includes("$500")) {
     return { text: `Proposed on ${ctx.objectRef ?? "this workflow"}: refunds above $500 require two approvers. Governed policy change — confirm to commit.`, actions: [{ label: "Confirm", kind: "commit" }] };
   }
@@ -140,6 +154,8 @@ export class HttpDataClient implements DataClient {
   getRuntime(id: string) { return this.get<RuntimeHealth>(`/api/projects/${id}/runtime`); }
   getTemplates(id: string) { return this.get<MissionTemplate[]>(`/api/projects/${id}/templates`); }
   getActivity(id: string) { return this.get<ActivityEvent[]>(`/api/projects/${id}/activity`); }
+  getDeploymentInspection(id: string) { return this.get<DeploymentInspection>(`/api/projects/${id}/deployment-inspection`); }
+  getSocialIntelligence(id: string) { return this.get<SocialMissionView>(`/api/projects/${id}/social-intelligence`); }
   private async post<T>(path: string, body: unknown): Promise<T> {
     const r = await fetch(this.base.replace(/\/$/, "") + path, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),

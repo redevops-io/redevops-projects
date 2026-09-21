@@ -5,6 +5,8 @@ import { Topbar } from "./components/Topbar";
 import { Sidekick, type SidekickSeed } from "./components/Sidekick";
 import { Overview } from "./views/Overview";
 import { Missions } from "./views/Missions";
+import { Inspection } from "./views/Inspection";
+import { SocialIntel } from "./views/SocialIntel";
 import { Workflows } from "./views/Workflows";
 import { SidekickTab } from "./views/SidekickTab";
 import { Attention } from "./views/Attention";
@@ -17,7 +19,8 @@ import { makeClient, type DataClient } from "./data/client";
 import type { ProjectOverview, SidekickContext } from "./data/types";
 
 const SECTION_LABEL: Record<Section, string> = {
-  overview: "Overview", missions: "Missions", workflows: "Workflows", sidekick: "Sidekick",
+  overview: "Overview", missions: "Missions", inspection: "Deployment Inspection",
+  social: "Social Intelligence", workflows: "Workflows", sidekick: "Sidekick",
   attention: "Attention", discovery: "Discovery", sources: "Sources", apps: "Apps",
   activity: "Activity", settings: "Settings",
 };
@@ -54,6 +57,8 @@ export function App({ client }: { client?: DataClient }) {
           ? <Overview data={overview} go={setSection} />
           : <section className="content"><div className="placeholder">Loading…</div></section>;
       case "missions": return <Missions client={api} go={setSection} ask={(t) => askSidekick(t, false)} />;
+      case "inspection": return <Inspection client={api} go={setSection} ask={(t) => askSidekick(t, false)} />;
+      case "social": return <SocialIntel client={api} go={setSection} ask={(t) => askSidekick(t, false)} />;
       case "workflows": return <Workflows client={api} go={setSection} />;
       case "sidekick": return <SidekickTab client={api} go={setSection} ctx={ctx} />;
       case "attention": return <Attention client={api} go={setSection} />;
@@ -72,7 +77,8 @@ export function App({ client }: { client?: DataClient }) {
         <Topbar project={overview?.project ?? null} onAsk={(t) => askSidekick(t, true)} onOpen={() => setSkOpen(true)} />
         {view()}
       </div>
-      <Sidekick open={skOpen} ctx={ctx} client={api} seed={skSeed} onClose={() => setSkOpen(false)} />
+      <Sidekick open={skOpen} ctx={ctx} client={api} seed={skSeed} onClose={() => setSkOpen(false)}
+        go={(s) => { setSection(s); setSkOpen(false); }} />
     </div>
   );
 }

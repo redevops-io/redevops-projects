@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import type { DataClient } from "../data/client";
+import type { Section } from "./Rail";
 import type { SidekickContext } from "../data/types";
 
-interface Msg { who: "you" | "sk"; text: string; actions?: { label: string; kind: string }[]; }
+interface Msg { who: "you" | "sk"; text: string; actions?: { label: string; kind: string; ref?: string }[]; }
 
 // A seed carries a suggested prompt into the panel. `send:false` pre-fills the input and
 // focuses it (the user edits before sending); `send:true` submits immediately so the panel
 // opens straight onto the answer. `nonce` lets the same text re-trigger and is consumed once.
 export interface SidekickSeed { text: string; send: boolean; nonce: number; }
 
-export function Sidekick({ open, ctx, client, onClose, seed }:
-  { open: boolean; ctx: SidekickContext; client: DataClient; onClose: () => void; seed?: SidekickSeed | null }) {
+export function Sidekick({ open, ctx, client, onClose, seed, go }:
+  { open: boolean; ctx: SidekickContext; client: DataClient; onClose: () => void;
+    seed?: SidekickSeed | null; go?: (s: Section) => void }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -62,7 +64,10 @@ export function Sidekick({ open, ctx, client, onClose, seed }:
                 <div className="acts">
                   {m.actions.map((a, j) => (
                     <button key={j} className={`btn sm ${a.kind === "edit" ? "" : "pri"}`}
-                      onClick={() => setMsgs((x) => [...x, { who: "sk", text: `✓ ${a.label}` }])}>{a.label}</button>
+                      onClick={() => {
+                        if (a.kind === "navigate" && a.ref && go) { go(a.ref as Section); return; }
+                        setMsgs((x) => [...x, { who: "sk", text: `✓ ${a.label}` }]);
+                      }}>{a.label}</button>
                   ))}
                 </div>
               )}
