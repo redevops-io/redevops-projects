@@ -189,7 +189,7 @@ export interface SidekickContext {
 
 export interface SidekickReply {
   text: string;
-  actions?: { label: string; kind: string }[];
+  actions?: { label: string; kind: string; ref?: string }[];
 }
 
 // ── Mission detail: the Used+Why half of the Available/Used/Why symmetry (doc). Actions =
@@ -231,4 +231,61 @@ export interface ConnectOutcome {
   scopes?: string[];
   credential_ref?: string;
   detail?: string;
+}
+
+// ── External Agent Gateway cards (Phase 9). These mirror the backend projections
+//    (agentic_os/agent_gateway/external/projections.py) and are rendered VERBATIM — the UI must not
+//    re-derive severity, provider availability, approval or verification. ──
+export interface DeploymentFinding {
+  source: string;
+  kind: string;
+  severity: string;          // "critical" | "high" | "medium" | "low" (rendered literally)
+  detail: string;
+  evidence_ref: string;
+}
+
+export interface GovernedActionView {
+  origin: string;
+  provider: string;
+  capability: string;
+  goal: string;
+  intent_digest: string;
+  approval: { required: boolean; state: string; decision_id: string; authorized: boolean };
+  evidence_refs: string[];
+  task_state: string;
+  receipt: { status: string; provider_post_id: string; receipt_id: string; decision_id: string };
+  verification: string;      // "verified" | "abstained" | "refuted" | "n/a" | "" (rendered literally)
+  failed: boolean;
+}
+
+export interface DeploymentInspection {
+  mission: string;
+  target: string;
+  connected: boolean;
+  boundary: { inspection: string; remediation: string };
+  kpis: { label: string; value: string; note?: string }[];
+  findings: DeploymentFinding[];
+  findings_by_severity: Record<string, DeploymentFinding[]>;
+  finding_count: number;
+  proposed_actions: string[];
+  governed_action: GovernedActionView | null;
+}
+
+export interface SocialSource { source: string; status: string; }   // status rendered literally
+export interface SocialOpportunityCounts {
+  total: number;
+  problem_signals: number;
+  solution_seeking: number;
+  commercial_intent_evidence: number;
+  unknown_commercial_intent: number;   // UNKNOWN must survive to the screen
+}
+export interface SocialMissionView {
+  mission: string;
+  sources: SocialSource[];
+  observations: number;
+  opportunities: SocialOpportunityCounts;
+  market_signals: number;
+  proposed_actions: string[];
+  opportunity_cards: Record<string, unknown>[];
+  data_source?: string;
 }

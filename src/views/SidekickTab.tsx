@@ -25,7 +25,7 @@ const RECENT = [
   "Show new Discovery findings",
 ];
 
-interface Msg { who: "you" | "sk"; text: string; actions?: { label: string; kind: string }[]; }
+interface Msg { who: "you" | "sk"; text: string; actions?: { label: string; kind: string; ref?: string }[]; }
 
 // A small pill/label style for the required-app and required-source chips (doc §16). Kept
 // inline — no new styles.css classes.
@@ -146,7 +146,8 @@ export function SidekickTab({ client, go, ctx }: { client: DataClient; go: (s: S
 
   // Reply-action handling: "setup" routes to where pieces connect; "confirm_source" commits
   // the confirm-first Source proposal; "commit" is a governed no-op stub; anything else echoes.
-  async function runAction(a: { label: string; kind: string }) {
+  async function runAction(a: { label: string; kind: string; ref?: string }) {
+    if (a.kind === "navigate" && a.ref) { go(a.ref as Section); return; }   // hand off to the Mission surface
     if (a.kind === "setup") { go("sources"); return; }
     if (a.kind === "confirm_source" && pendingSource) {
       const created = await client.confirmSources(ctx.projectId, pendingSource.sources, "you");
