@@ -60,4 +60,4 @@ npm run build      # typecheck + vite build
 VITE_PROJECTS_API=http://localhost:8000 npm run dev
 ```
 
-Licensed AGPL-3.0-or-later.
+Licensed AGPL-3.0-or-later with the Commons Clause. See [LICENSE.md](LICENSE.md).
