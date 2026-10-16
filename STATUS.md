@@ -26,4 +26,4 @@ The Projects capability is served by `agentic-os` (`agentic_os/projects_api.py`,
 
 - The README's "P1" status text may lag the code: `src/views/` has views and tests for Missions, Workflows, Attention, Discovery, Apps, Activity and others; their completeness was not assessed (to be confirmed by maintainers).
 - Before this change the README did not say that the product capability lives in agentic-os.
-- Licence labelling differs between GitHub (shows AGPL-3.0) and `LICENSE.md`; flagged for counsel in the PR, no conclusion here.
+- Licence: see `LICENSE.md`.
