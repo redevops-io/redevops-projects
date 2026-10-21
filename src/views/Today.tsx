@@ -11,7 +11,7 @@ import type { BatchRequest, CaptureItem, Health, TodayDetail, TodayFeed, TodayIt
 const PROJECT = "customer-ops";
 const BUDGET = 7;                       // visible "needs your decision" rows before "Show more" (none are dropped)
 const SNOOZES: { label: string; seconds: number }[] = [
-  { label: "1 hour", seconds: 3600 }, { label: "Tomorrow", seconds: 86400 }, { label: "3 days", seconds: 3 * 86400 },
+  { label: "1 hour", seconds: 3600 }, { label: "Tomorrow", seconds: 86400 }, { label: "3 days", seconds: 3 * 86400 }, { label: "Next week", seconds: 7 * 86400 },
 ];
 const STEPS: { key: keyof TodayLifecycle; label: string }[] = [
   { key: "suggested", label: "Suggested" }, { key: "approved", label: "Approved" }, { key: "sent", label: "Sent" },
@@ -68,6 +68,8 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
   const [roster, setRoster] = useState<{ to: TodayRecipient[]; skipped: { id: string; label: string; reason: string }[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ tone: Health; text: string } | null>(null);
+  const [query, setQuery] = useState("");                       // find a customer or item (nothing is hidden by the 7-row budget while searching)
+  const findRef = useRef<HTMLInputElement>(null);
   const [showAll, setShowAll] = useState(false);
   const [showDone, setShowDone] = useState(false);
   // Quick Capture: one field. The system decides where it goes; capturing never sends or approves anything.
@@ -101,8 +103,13 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
     const t = setTimeout(() => void loadFeed(), 5_000);
     return () => clearTimeout(t);
   }, [feed, err, loadError, loadFeed]);
+  // The item a deep link / notification asked for. Kept in a ref the moment it is consumed: the parent clears its `focusItem`
+  // prop and this component's `sel` update are two separate state updates, and React does NOT guarantee they land in the same
+  // render (under load the parent's null arrived first, and the default selection below overwrote the deep link — seen as a
+  // ~1-in-8 flake, reproduced and captured). The default selection must never depend on that ordering.
+  const requested = useRef<string | null>(null);
   useEffect(() => {      // a notification opened Today on a specific item
-    if (focusItem && feed?.items.some((i) => i.id === focusItem)) { setSel(focusItem); onFocused?.(); }
+    if (focusItem && feed?.items.some((i) => i.id === focusItem)) { requested.current = focusItem; setSel(focusItem); onFocused?.(); }
     else if (focusItem && feed) { void loadFeed(); }
   }, [focusItem, feed, onFocused, loadFeed]);
   const loadIntake = useCallback(async () => {
@@ -119,7 +126,7 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
   const togglePick = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   async function runBatch(req: Omit<BatchRequest, "item_ids">, done: string) {
     if (batchBusy || !picked.length) return;
-    setBatchBusy(true); setBatchNote(null);
+    setBatchBusy(true); setBatchNote(null); setCapNote(null);
     try {
       const r = await client.batchToday(PROJECT, { ...req, item_ids: picked });
       if (!live.current) return;
@@ -186,16 +193,24 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
   useEffect(() => {
     if (!feed) return;
     if (focusItem && feed.items.some((i) => i.id === focusItem)) return;        // a deep link / notification chose the item; don't override it
-    if (!sel || !feed.items.some((i) => i.id === sel)) setSel(feed.items.find((i) => i.state === "needs_action")?.id ?? feed.items[0]?.id ?? null);
+    if (!sel || !feed.items.some((i) => i.id === sel)) {
+      // an item was asked for but its selection has not been applied yet (see `requested`): honour it instead of the default
+      const asked = requested.current && feed.items.some((i) => i.id === requested.current) ? requested.current : null;
+      requested.current = null;
+      setSel(asked ?? feed.items.find((i) => i.state === "needs_action")?.id ?? feed.items[0]?.id ?? null);
+    }
   }, [feed, sel, focusItem]);
   useEffect(() => {
     setTargets(undefined); setIdentity(undefined); setNote(null); setDetail(null); setRoster(null);
     if (sel) void loadDetail(sel);
   }, [sel, loadDetail]);
 
-  const items = feed?.items ?? [];
+  const allItems = feed?.items ?? [];
+  const q = query.trim().toLowerCase();
+  const items = useMemo(() => (q ? allItems.filter((i) => `${i.user_title} ${i.reason} ${i.owner ?? ""} ${i.category ?? ""}`.toLowerCase().includes(q)) : allItems), [allItems, q]);
+  const budgetOn = !q && !showAll;                              // while searching, show every match
   const grouped = useMemo(() => GROUPS.map((g) => ({ ...g, items: items.filter((i) => g.states.includes(i.state)) })), [items]);
-  const flat = useMemo(() => grouped.flatMap((g) => g.items.filter((it) => (g.id !== "decide" || showAll || g.items.indexOf(it) < BUDGET) && (g.id !== "done" || showDone))), [grouped, showAll, showDone]);
+  const flat = useMemo(() => grouped.flatMap((g) => g.items.filter((it) => (g.id !== "decide" || !budgetOn || g.items.indexOf(it) < BUDGET) && (g.id !== "done" || showDone || !!q))), [grouped, budgetOn, showDone, q]);
 
   // keyboard triage: j/k (or arrows) move through the queue
   useEffect(() => {
@@ -204,6 +219,7 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "c") { e.preventDefault(); capRef.current?.focus(); return; }
+      if (e.key === "/") { e.preventDefault(); findRef.current?.focus(); return; }
       if (e.key === "x" && sel) {
         const it = flat.find((f) => f.id === sel);
         if (it && selectable(it)) { e.preventDefault(); setSelectMode(true); togglePick(sel); }
@@ -223,7 +239,7 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
 
   async function run(fn: () => Promise<TodayDetail>, ok: (d: TodayDetail) => string) {
     if (busy || !sel) return;
-    setBusy(true); setNote(null);
+    setBusy(true); setNote(null); setCapNote(null);               // the "Linked to… nothing has been sent" note is about a moment that has passed
     try {
       const d = await fn();
       if (!live.current) return;
@@ -272,7 +288,7 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
           aria-label={`Select: ${it.user_title}`} title={selectable(it) ? undefined : "Comes from a live signal — resolve it where it originates"}
           onChange={() => togglePick(it.id)} />
       )}
-    <button className="trow" aria-current={sel === it.id} onClick={() => setSel(it.id)}>
+    <button className="trow" aria-current={sel === it.id} onClick={() => { setSel(it.id); setCapNote(null); }}>
       <span className="grow">
         <span className="t">{it.user_title}</span>
         <span className="s">{it.state === "waiting" || it.state === "failed" || it.resurfaced ? (it.status_line || it.reason) : it.reason}</span>
@@ -298,6 +314,14 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
             onChange={(e) => setText(e.target.value)} />
           <button className="btn pri" type="submit" disabled={capBusy || !text.trim()}>{capBusy ? "Saving…" : "Capture"}</button>
         </form>
+        {allItems.length > 0 && (
+          <div className="find">
+            <label htmlFor="find-input" className="sr">Find a customer or item</label>
+            <input id="find-input" ref={findRef} type="search" value={query} autoComplete="off" placeholder="Find a customer or item…"
+              onChange={(e) => setQuery(e.target.value)} />
+            <span className="s" role="status" aria-live="polite">{q ? `${items.length} match${items.length === 1 ? "" : "es"}` : ""}</span>
+          </div>
+        )}
         {capNote && (
           <div className={`banner ${capNote.tone}`} role="status">{capNote.text}
             {capNote.open && <> <button className="btn sm" type="button" onClick={() => setSel(capNote.open!)}>Open</button></>}</div>
@@ -305,7 +329,7 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
       </div>
 
       <div className="split">
-        <div className="queue" aria-label="Work that needs attention">
+        <section className="queue" aria-label="Work that needs attention">
           {items.length > 0 && (
             <div className="batchbar">
               <button className="btn sm" aria-pressed={selectMode} onClick={() => { setSelectMode(!selectMode); setPicked([]); setBatchNote(null); }}>
@@ -334,19 +358,20 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
             <div className={`banner ${batchNote.tone}`} role="status">{batchNote.text}
               {batchNote.token && <> <button className="btn sm" onClick={() => void undoBatch(batchNote.token!)}>Undo</button></>}</div>
           )}
-          {items.length === 0 && <div className="card"><div className="bd">Nothing needs you right now.</div></div>}
+          {allItems.length > 0 && items.length === 0 && <div className="card"><div className="bd">No items match “{query.trim()}”. <button className="btn sm" onClick={() => setQuery("")}>Clear</button></div></div>}
+          {allItems.length === 0 && <div className="card"><div className="bd">Nothing needs you right now.</div></div>}
           {grouped.map((g) => {
             if (!g.items.length) return null;
             const isDone = g.id === "done", isDecide = g.id === "decide";
-            const visible = isDecide && !showAll ? g.items.slice(0, BUDGET) : g.items;
+            const visible = isDecide && budgetOn ? g.items.slice(0, BUDGET) : g.items;
             return (
               <div className="card" key={g.id}>
                 <div className="hd"><Pill tone={g.tone}>{g.title}</Pill><span className="eyebrow" style={{ marginLeft: "auto" }}>{g.items.length}</span></div>
                 <div className="bd">
-                  {isDone && !showDone
+                  {isDone && !showDone && !q
                     ? <button className="btn sm" onClick={() => setShowDone(true)}>Show {g.items.length} finished</button>
                     : visible.map(row)}
-                  {isDecide && g.items.length > BUDGET && (
+                  {isDecide && !q && g.items.length > BUDGET && (
                     <button className="btn sm" onClick={() => setShowAll(!showAll)}>{showAll ? "Show fewer" : `Show ${g.items.length - BUDGET} more`}</button>
                   )}
                 </div>
@@ -377,8 +402,8 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
               </div>
             </div>
           )}
-          <div className="s hint">Tips: j / k move through the queue · c captures · x selects.</div>
-        </div>
+          <div className="s hint">Tips: j / k move through the queue · c captures · / finds · x selects.</div>
+        </section>
 
         <aside className="detail card" aria-label="Item details">
           {!detail && note ? (

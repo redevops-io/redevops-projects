@@ -107,11 +107,11 @@ export function App({ client }: { client?: DataClient }) {
     <div className="app">
       <a className="skip" href="#main">Skip to content</a>
       <Rail section={section} onNavigate={setSection} badges={{ today: notif.state?.count ?? todayCount ?? 0 }} />
-      <div className="main" id="main" tabIndex={-1}>
+      <div className="main">
         <Topbar project={overview?.project ?? null} onAsk={(t) => askSidekick(t, true)} onOpen={() => setSkOpen(true)} />
         <ConnectionBanner problem={notif.problem} onRetry={() => void notif.refresh()} />
         <SectionTabs section={section} onNavigate={setSection} />
-        <ErrorBoundary resetKey={section}>{view()}</ErrorBoundary>
+        <main id="main" tabIndex={-1} className="viewport"><ErrorBoundary resetKey={section}>{view()}</ErrorBoundary></main>
       </div>
       <NotificationToasts pending={notif.state?.pending ?? []}
         onOpen={(n) => { setSection("today"); setFocusItem(n.id); void notif.ack([n.key]); }}

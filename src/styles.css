@@ -230,3 +230,17 @@ ol.steps li{margin:4px 0}
 .connbar.unauthenticated,.connbar.incompatible{background:var(--bad-wash);color:var(--bad)}
 .connbar strong{font-weight:700} .connbar span{flex:1 1 240px}
 @media(max-width:820px){.connbar{padding:8px 14px}}
+
+/* closed drawer: hidden (not merely off-screen) so it is not focusable or read out; visibility flips after the slide-out */
+aside.sk{visibility:hidden;transition:transform .22s ease,visibility 0s linear .22s}
+aside.sk.open{visibility:visible;transition:transform .22s ease,visibility 0s}
+@media(prefers-reduced-motion:reduce){aside.sk,aside.sk.open{transition:none}}
+/* WCAG 2.5.8: every target at least 24x24 */
+.ask input{min-height:24px}
+.tech summary{min-height:24px;padding:4px 0;display:list-item}
+main.viewport{display:block;min-width:0;outline:none}
+
+/* find */
+.find{display:flex;align-items:center;gap:10px;margin-top:8px}
+.find input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line-2);border-radius:10px;padding:7px 12px;color:var(--ink);font:inherit;min-height:24px}
+.find input::placeholder{color:var(--muted)}
