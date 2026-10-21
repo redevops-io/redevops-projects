@@ -5,8 +5,7 @@
 > **🚀 NVIDIA Inception Program Member** — ReDevOps is a member of the NVIDIA Inception Program, supporting startups advancing AI and accelerated computing. Membership provides access to NVIDIA technology, technical resources, and the startup ecosystem. It does not imply product endorsement by NVIDIA.
 
 **What it does.** The React front-end shell for ReDevOps **Projects**, a workspace over the Runtime stack (Missions, Workflows,
-Attention, Discovery, Apps, Activity) with a context-aware Sidekick panel. Today it is P1 of a P1-P10 build order: app shell,
-Sidekick panel, and a Projects API client; most sections are titled placeholders.
+Attention, Discovery, Apps, Activity) with a context-aware Sidekick panel. It is the **source of truth for the Projects UI**: 12 sections (Overview, Missions, Inspection, Social, Workflows, Sidekick, Attention, Discovery, Sources, Apps, Activity, Settings) are implemented in `src/views/` and wired through `HttpDataClient`. The P1-P10 list below is the original build order; the code is ahead of it (P1-P8 present, depth vs spec not assessed).
 
 **Who it's for.** Contributors building the Projects UI, and anyone reading how the UI is meant to sit on the agentic-os Projects API.
 It is **not** where Projects runs today.
@@ -32,7 +31,7 @@ npm test             # vitest
 **Evidence.** The vitest suite (`src/**/*.test.tsx`) and `npm run typecheck`; no benchmark or performance numbers are claimed.
 Not run for this documentation change.
 
-**Limitations.** The status text below ("P1") is the maintainers' stated status; `src/views/` also contains views and tests for sections it calls placeholders (Missions, Workflows, Attention, Discovery, Apps, Activity), whose depth was not assessed, so the P1 label may be out of date (to be confirmed). P2-P10 are not built per that text; no live backend is bundled; the UI only reflects what the agentic-os Projects API exposes.
+**Limitations.** The code is ahead of the old "P1" label: `src/views/` has a view and test file for every section. Their depth against the original spec, and the test suite itself, were not re-run for this documentation change. The UI calls `/api/projects/:id/deployment-inspection` and `/social-intelligence`, which no route in agentic-os `projects_api.py` serves (checked 2026-10-21), so those two cards work on the mock client only until the API adds them. The build vendored into agentic-os (`agentic_os/projects_ui/`, 2026-09-09) predates them. No live backend is bundled.
 The Sidekick here is the conversational Projects interface, not the `sidekick` coding-agent orchestrator repo.
 
 **Projects** — the persistent human workspace over the ReDevOps Runtime stack. Missions,
@@ -43,15 +42,14 @@ Sidekick proposes and the Runtime commits.
 > Projects = state interface · Sidekick = intent interface. The nav is organised by
 > **user concepts, not Runtime names** (Runtime-aware, not Runtime-shaped).
 
-## Status — P1 (shell + data seam)
+## Status — P1–P8 views present (see STATUS.md)
 
-This is P1 of the build order: the app shell (grouped nav rail, project selector, topbar
+Originally P1 of the build order: the app shell (grouped nav rail, project selector, topbar
 `Ask Sidekick ⌘K`), a **context-aware Sidekick** panel, and the **Projects API client** with
-its projection contracts. Overview is wired end-to-end from the client; the other sections
-are titled placeholders that port from the prototype next (P2–P8).
+its projection contracts. Every section now has a view and test file; P9 (end-to-end demo) has an e2e recorder (`e2e/`); P10 packaging is done by agentic-os's `scripts/build_projects_ui.sh`, which builds this repo and vendors the output.
 
 ```
-P1  shell · project selector · sidebar · context Sidekick · Projects API client   ← this
+P1  shell · project selector · sidebar · context Sidekick · Projects API client   ← done
 P2  Mission projections + detail
 P3  Attention projection (cross-runtime queue)
 P4  Apps — ProviderSetupGuide · SetupState · credential broker · verify
