@@ -45,6 +45,18 @@ describe("App routing — one implementation for browser and desktop", () => {
     expect(await screen.findByRole("heading", { level: 2, name: /3 patients haven't confirmed/ })).toBeTruthy();
   });
 
+  it("an outside hash change moves ACROSS sections (a desktop deep link from anywhere), not just within Today", async () => {
+    render(<App client={new MockDataClient()} />);
+    await screen.findByText("5 things need your decision.");
+    for (const [hash, heading, dest] of [["#/activity", "Activity", "Activity"], ["#/apps", "Apps", "Connections"], ["#/missions", "Everything running, waiting, and scheduled", "Work"]] as const) {
+      await act(async () => { window.location.hash = hash; });
+      expect(await screen.findByRole("heading", { level: 1, name: heading })).toBeTruthy();
+      expect(primary().getByRole("button", { name: new RegExp(`^${dest}`) }).getAttribute("aria-current")).toBe("page");
+    }
+    await act(async () => { window.location.hash = "#/today/case-clinic"; });
+    expect(await screen.findByRole("heading", { level: 2, name: /3 patients haven't confirmed/ })).toBeTruthy();   // and back, onto an item
+  });
+
   it("restores the last place after a restart (no hash), and Today is still the default for a fresh profile", async () => {
     const first = render(<App client={new MockDataClient()} />);
     await screen.findByText("5 things need your decision.");
