@@ -1,8 +1,11 @@
 export type Section =
-  | "overview" | "missions" | "inspection" | "social" | "workflows" | "sidekick" | "attention"
+  | "today" | "overview" | "missions" | "inspection" | "social" | "workflows" | "sidekick" | "attention"
   | "discovery" | "sources" | "apps" | "activity" | "settings";
 
 const GROUPS: { group: string; items: { id: Section; icon: string; label: string; badge?: number }[] }[] = [
+  { group: "TODAY", items: [
+    { id: "today", icon: "☀", label: "Today" },
+  ] },
   { group: "WORK", items: [
     { id: "overview", icon: "▦", label: "Overview" },
     { id: "missions", icon: "◈", label: "Missions" },
@@ -23,7 +26,7 @@ const GROUPS: { group: string; items: { id: Section; icon: string; label: string
   ] },
 ];
 
-export function Rail({ section, onNavigate }: { section: Section; onNavigate: (s: Section) => void }) {
+export function Rail({ section, onNavigate, badges }: { section: Section; onNavigate: (s: Section) => void; badges?: Partial<Record<Section, number>> }) {
   return (
     <aside className="rail">
       <div className="brand"><span className="logo">◆</span><span className="txt">ReDevOps</span></div>
@@ -35,7 +38,7 @@ export function Rail({ section, onNavigate }: { section: Section; onNavigate: (s
               onClick={() => onNavigate(it.id)}>
               <span className="ic">{it.icon}</span>
               <span className="lbl">{it.label}</span>
-              {it.badge ? <span className="badge">{it.badge}</span> : null}
+              {(badges?.[it.id] ?? it.badge) ? <span className="badge">{badges?.[it.id] ?? it.badge}</span> : null}
             </button>
           ))}
         </div>

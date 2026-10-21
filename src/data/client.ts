@@ -6,9 +6,13 @@
 import type {
   ActivityEvent, AppCapability, AttentionItem, ConnectOutcome, ContextSource, DeploymentInspection,
   DiscoveryFinding, MissionSummary, MissionDetail, MissionTemplate, ProjectOverview, ProjectRef,
-  RuntimeHealth, SidekickContext, SidekickReply, SocialMissionView, SourceProposal, WorkflowSummary,
+  RuntimeHealth, SidekickContext, SidekickReply, SocialMissionView, SourceProposal, TodayDetail, TodayFeed,
+  TodayItemOptions, WorkflowSummary,
 } from "./types";
 import * as mock from "./mock";
+import { MockToday, TodayApiError } from "./mockToday";
+
+export { TodayApiError };
 
 export interface DataClient {
   listProjects(): Promise<ProjectRef[]>;
@@ -29,6 +33,14 @@ export interface DataClient {
   proposeSource(projectId: string, text: string): Promise<SourceProposal>;
   confirmSources(projectId: string, sources: SourceProposal["sources"], confirmedBy: string): Promise<ContextSource[]>;
   connectApp(provider: string): Promise<ConnectOutcome>;
+  // Today — outcome-first feed. approve() binds the exact payload_digest the user reviewed; the server refuses
+  // (409 stale_approval) if the content, recipients or attempt changed since.
+  getToday(projectId: string): Promise<TodayFeed>;
+  getTodayItem(projectId: string, itemId: string, opts?: TodayItemOptions): Promise<TodayDetail>;
+  approveToday(projectId: string, itemId: string, req: { payload_digest: string; targets?: string[]; identity_id?: string }): Promise<TodayDetail>;
+  snoozeToday(projectId: string, itemId: string, seconds: number): Promise<TodayDetail>;
+  dismissToday(projectId: string, itemId: string): Promise<TodayDetail>;
+  simulateTodayOutcome(projectId: string, itemId: string): Promise<TodayDetail>;
 }
 
 export class MockDataClient implements DataClient {
@@ -64,6 +76,13 @@ export class MockDataClient implements DataClient {
   async getActivity() { return mock.ACTIVITY; }
   async getDeploymentInspection() { return mock.DEPLOYMENT_INSPECTION; }
   async getSocialIntelligence() { return mock.SOCIAL_INTELLIGENCE; }
+  private today = new MockToday();
+  async getToday() { return this.today.feed(); }
+  async getTodayItem(_p: string, id: string, o?: TodayItemOptions) { return this.today.item(id, o); }
+  async approveToday(_p: string, id: string, req: { payload_digest: string; targets?: string[]; identity_id?: string }) { return this.today.approve(id, req); }
+  async snoozeToday(_p: string, id: string, seconds: number) { return this.today.snooze(id, seconds); }
+  async dismissToday(_p: string, id: string) { return this.today.dismiss(id); }
+  async simulateTodayOutcome(_p: string, id: string) { return this.today.simulateOutcome(id); }
   async askSidekick(ctx: SidekickContext, text: string) { return scriptedReply(ctx, text); }
   async proposeSource(projectId: string, text: string) { return scriptedSourceProposal(projectId, text); }
   async confirmSources(_projectId: string, sources: SourceProposal["sources"]) {
@@ -135,6 +154,17 @@ export function scriptedReply(ctx: SidekickContext, text: string): SidekickReply
   return { text: "I can turn that into a governed Mission across your connected apps. Want me to propose the steps?" };
 }
 
+function newSession(): string {
+  try {
+    const k = "redevops.today.session";
+    const have = sessionStorage.getItem(k);
+    if (have) return have;
+    const id = Math.random().toString(36).slice(2, 12);
+    sessionStorage.setItem(k, id);
+    return id;
+  } catch { return Math.random().toString(36).slice(2, 12); }     // storage can be blocked; a per-load id still isolates
+}
+
 export class HttpDataClient implements DataClient {
   constructor(private base: string) {}
   private async get<T>(path: string): Promise<T> {
@@ -163,6 +193,33 @@ export class HttpDataClient implements DataClient {
     if (!r.ok) throw new Error(`Projects API ${path} → ${r.status}`);
     return (await r.json()) as T;
   }
+  // Today calls carry a per-tab session id so an anonymous demo gets its own sandbox ledger server-side.
+  private session = newSession();
+  private async today<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+    const r = await fetch(this.base.replace(/\/$/, "") + path, {
+      method, headers: { Accept: "application/json", "X-Demo-Session": this.session, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!r.ok) {
+      let code = "error", msg = `Projects API ${path} → ${r.status}`;
+      try { const d = (await r.json())?.detail; if (d && typeof d === "object") { code = d.error ?? code; msg = d.detail ?? msg; } } catch { /* keep the generic message */ }
+      throw new TodayApiError(r.status, code, msg);
+    }
+    return (await r.json()) as T;
+  }
+  getToday(id: string) { return this.today<TodayFeed>("GET", `/api/projects/${id}/today`); }
+  getTodayItem(id: string, itemId: string, o: TodayItemOptions = {}) {
+    const q = new URLSearchParams();
+    if (o.targets?.length) q.set("targets", o.targets.join(","));
+    if (o.identityId) q.set("identity_id", o.identityId);
+    return this.today<TodayDetail>("GET", `/api/projects/${id}/today/${encodeURIComponent(itemId)}${q.size ? `?${q}` : ""}`);
+  }
+  approveToday(id: string, itemId: string, req: { payload_digest: string; targets?: string[]; identity_id?: string }) {
+    return this.today<TodayDetail>("POST", `/api/projects/${id}/today/${encodeURIComponent(itemId)}/approve`, req);
+  }
+  snoozeToday(id: string, itemId: string, seconds: number) { return this.today<TodayDetail>("POST", `/api/projects/${id}/today/${encodeURIComponent(itemId)}/snooze`, { seconds }); }
+  dismissToday(id: string, itemId: string) { return this.today<TodayDetail>("POST", `/api/projects/${id}/today/${encodeURIComponent(itemId)}/dismiss`, {}); }
+  simulateTodayOutcome(id: string, itemId: string) { return this.today<TodayDetail>("POST", `/api/projects/${id}/today/${encodeURIComponent(itemId)}/simulate-outcome`, {}); }
   askSidekick(ctx: SidekickContext, text: string) { return this.post<SidekickReply>("/api/sidekick", { ctx, text }); }
   proposeSource(projectId: string, text: string) { return this.post<SourceProposal>("/api/sources/propose", { project_id: projectId, text }); }
   confirmSources(projectId: string, sources: SourceProposal["sources"], confirmedBy: string) {

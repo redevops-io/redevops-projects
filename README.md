@@ -5,7 +5,7 @@
 > **🚀 NVIDIA Inception Program Member** — ReDevOps is a member of the NVIDIA Inception Program, supporting startups advancing AI and accelerated computing. Membership provides access to NVIDIA technology, technical resources, and the startup ecosystem. It does not imply product endorsement by NVIDIA.
 
 **What it does.** The React front-end shell for ReDevOps **Projects**, a workspace over the Runtime stack (Missions, Workflows,
-Attention, Discovery, Apps, Activity) with a context-aware Sidekick panel. It is the **source of truth for the Projects UI**: 12 sections (Overview, Missions, Inspection, Social, Workflows, Sidekick, Attention, Discovery, Sources, Apps, Activity, Settings) are implemented in `src/views/` and wired through `HttpDataClient`. The P1-P10 list below is the original build order; the code is ahead of it (P1-P8 present, depth vs spec not assessed).
+Attention, Discovery, Apps, Activity) with a context-aware Sidekick panel. It is the **source of truth for the Projects UI**: 13 sections — **Today is the default landing** (an outcome-first queue: what needs a decision, what is waiting, what is scheduled; inspect → approve → verify) — plus Overview, Missions, Inspection, Social, Workflows, Sidekick, Attention, Discovery, Sources, Apps, Activity, Settings, are implemented in `src/views/` and wired through `HttpDataClient`. The P1-P10 list below is the original build order; the code is ahead of it (P1-P8 present, depth vs spec not assessed).
 
 **Who it's for.** Contributors building the Projects UI, and anyone reading how the UI is meant to sit on the agentic-os Projects API.
 It is **not** where Projects runs today.
