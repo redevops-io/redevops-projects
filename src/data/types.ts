@@ -316,6 +316,8 @@ export interface TodayItem {
   confidence: number | null;
   stale: boolean;
   resurfaced?: boolean;
+  category?: string;
+  epoch?: number;
   simulated?: boolean;
   domain?: string;
   channel?: string;
@@ -386,4 +388,24 @@ export interface CaptureItem {
   events: { at: number; kind: string; text: string; version: number }[];
   version: number;
   duplicate?: boolean;
+}
+
+// ── Batch triage (reversible only) + notifications derived from Today (agentic_os/today.py) ──
+export type BatchAction = "snooze" | "dismiss" | "assign" | "categorize";   // never approve: that is one exact payload at a time
+export interface BatchRequest { action: BatchAction; item_ids: string[]; seconds?: number; assignee?: string; category?: string }
+export interface BatchResult {
+  action: BatchAction;
+  results: { id: string; ok: boolean; error?: string; detail?: string }[];
+  ok_count: number; failed_count: number;
+  undo: { token: string; expires_at: number } | null;
+}
+export interface UndoResult { action: BatchAction; results: { id: string; restored: boolean; reason?: string }[]; restored_count: number }
+export interface TodayNotification { key: string; id: string; title: string; reason: string; kind: string; resurfaced: boolean }
+export interface NotificationPrefs { enabled: boolean; quiet_start: number | null; quiet_end: number | null; tz_offset_minutes: number }
+export interface TodayNotifications {
+  generated_at: number;
+  count: number;                       // genuinely actionable items
+  summary: string;                     // content-free: safe for a lock screen / the window title
+  pending: TodayNotification[];        // not yet acknowledged; empty during quiet hours or when disabled
+  suppressed: number; quiet_now: boolean; prefs: NotificationPrefs;
 }

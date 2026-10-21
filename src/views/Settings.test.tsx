@@ -11,7 +11,7 @@ describe("Settings (project-level durable configuration)", () => {
     expect(screen.getByText("Customer Operations")).toBeTruthy();
 
     // switching to Security reveals the credential broker row
-    fireEvent.click(screen.getByRole("button", { name: "Security" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Security" }));
     expect(screen.getByText("Credential broker")).toBeTruthy();
   });
 });

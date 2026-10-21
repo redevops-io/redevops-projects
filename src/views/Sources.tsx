@@ -133,7 +133,7 @@ function AddSource({ client, go, onConnected }: {
             <button
               key={c}
               className={`btn${choice === c ? " pri" : ""}`}
-              aria-selected={choice === c}
+              aria-pressed={choice === c}
               onClick={() => {
                 setScanned(null);
                 if (c === "Ask Sidekick") { go("sidekick"); return; }
@@ -291,9 +291,9 @@ export function Sources({ client, go }: { client: DataClient; go: (s: Section) =
         <h1 className="h">Sources</h1>
       </div>
 
-      <div className="tabsrow">
+      <div className="tabsrow" role="tablist">
         {TABS.map((t) => (
-          <button key={t.id} aria-selected={t.id === tab} onClick={() => setTab(t.id)}>{t.label}</button>
+          <button role="tab" key={t.id} aria-selected={t.id === tab} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
 

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pill } from "../components/Pill";
-import type { Section } from "../components/Rail";
+import type { Section } from "../nav";
 import { TodayApiError, type DataClient } from "../data/client";
-import type { CaptureItem, Health, TodayDetail, TodayFeed, TodayItem, TodayLifecycle, TodayRecipient, TodayState } from "../data/types";
+import type { BatchRequest, CaptureItem, Health, TodayDetail, TodayFeed, TodayItem, TodayLifecycle, TodayRecipient, TodayState } from "../data/types";
 
 // Today — the default landing (CONTROL_SURFACES_UX plan §3). One ranked queue of what needs a human, in
 // domain language, with the next safe action beside it. Every state, priority, approval and digest is rendered
@@ -48,7 +48,7 @@ function Stepper({ lc, failed }: { lc: TodayLifecycle; failed: boolean }) {
   );
 }
 
-export function Today({ client, go, onCount }: { client: DataClient; go: (s: Section) => void; onCount?: (n: number) => void }) {
+export function Today({ client, go, onCount, focusItem, onFocused }: { client: DataClient; go: (s: Section) => void; onCount?: (n: number) => void; focusItem?: string | null; onFocused?: () => void }) {
   const [feed, setFeed] = useState<TodayFeed | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [sel, setSel] = useState<string | null>(null);
@@ -67,6 +67,12 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
   const [capNote, setCapNote] = useState<{ tone: Health; text: string; open?: string } | null>(null);
   const [intake, setIntake] = useState<CaptureItem[]>([]);
   const capRef = useRef<HTMLInputElement>(null);
+  // Batch triage: reversible actions only. Approving an external send is never offered here — one exact payload at a time.
+  const [selectMode, setSelectMode] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [label, setLabel] = useState("");
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchNote, setBatchNote] = useState<{ tone: Health; text: string; token?: string } | null>(null);
   const live = useRef(true);
   useEffect(() => () => { live.current = false; }, []);
 
@@ -80,6 +86,10 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
     } catch (e) { if (live.current) setErr(String((e as Error).message ?? e)); return null; }
   }, [client, onCount]);
   useEffect(() => { void loadFeed(); }, [loadFeed]);
+  useEffect(() => {      // a notification opened Today on a specific item
+    if (focusItem && feed?.items.some((i) => i.id === focusItem)) { setSel(focusItem); onFocused?.(); }
+    else if (focusItem && feed) { void loadFeed(); }
+  }, [focusItem, feed, onFocused, loadFeed]);
   const loadIntake = useCallback(async () => {
     try {
       const l = await client.listCaptures(PROJECT);
@@ -89,6 +99,32 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
     } catch { /* intake is optional; the queue still works */ }
   }, [client]);
   useEffect(() => { void loadIntake(); }, [loadIntake]);
+
+  const selectable = (it: TodayItem) => it.kind === "case" || it.kind === "reminder";
+  const togglePick = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  async function runBatch(req: Omit<BatchRequest, "item_ids">, done: string) {
+    if (batchBusy || !picked.length) return;
+    setBatchBusy(true); setBatchNote(null);
+    try {
+      const r = await client.batchToday(PROJECT, { ...req, item_ids: picked });
+      if (!live.current) return;
+      const failed = r.results.filter((x) => !x.ok);
+      const why = failed.length ? ` ${failed.length} couldn't be changed: ${[...new Set(failed.map((f) => f.detail ?? f.error))].join("; ")}` : "";
+      setBatchNote({ tone: failed.length ? "warn" : "ok", text: `${done} ${r.ok_count} item${r.ok_count === 1 ? "" : "s"}.${why}`, token: r.undo?.token });
+      setPicked(failed.map((f) => f.id)); setLabel("");
+      await loadFeed();
+      if (sel) await loadDetail(sel);
+    } catch (e) { if (live.current) setBatchNote({ tone: "bad", text: (e as Error).message ?? String(e) }); }
+    finally { if (live.current) setBatchBusy(false); }
+  }
+  async function undoBatch(token: string) {
+    try {
+      const r = await client.undoBatch(PROJECT, token);
+      const skipped = r.results.filter((x) => !x.restored).length;
+      setBatchNote({ tone: skipped ? "warn" : "ok", text: `Undone for ${r.restored_count} item${r.restored_count === 1 ? "" : "s"}.${skipped ? ` ${skipped} had changed since, so they were left as you set them.` : ""}` });
+      await loadFeed(); if (sel) await loadDetail(sel);
+    } catch (e) { setBatchNote({ tone: "bad", text: (e as Error).message ?? String(e) }); }
+  }
 
   async function submitCapture() {
     const t = text.trim();
@@ -152,6 +188,11 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "c") { e.preventDefault(); capRef.current?.focus(); return; }
+      if (e.key === "x" && sel) {
+        const it = flat.find((f) => f.id === sel);
+        if (it && selectable(it)) { e.preventDefault(); setSelectMode(true); togglePick(sel); }
+        return;
+      }
       const dir = e.key === "j" || e.key === "ArrowDown" ? 1 : e.key === "k" || e.key === "ArrowUp" ? -1 : 0;
       if (!dir || !flat.length) return;
       e.preventDefault();
@@ -200,7 +241,13 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
   if (!feed) return <section className="content"><div className="placeholder" role="status">Loading…</div></section>;
 
   const row = (it: TodayItem) => (
-    <button key={it.id} className="trow" aria-current={sel === it.id} onClick={() => setSel(it.id)}>
+    <div className="trowwrap" key={it.id}>
+      {selectMode && (
+        <input type="checkbox" className="pick" checked={picked.includes(it.id)} disabled={!selectable(it)}
+          aria-label={`Select: ${it.user_title}`} title={selectable(it) ? undefined : "Comes from a live signal — resolve it where it originates"}
+          onChange={() => togglePick(it.id)} />
+      )}
+    <button className="trow" aria-current={sel === it.id} onClick={() => setSel(it.id)}>
       <span className="grow">
         <span className="t">{it.user_title}</span>
         <span className="s">{it.state === "waiting" || it.state === "failed" || it.resurfaced ? (it.status_line || it.reason) : it.reason}</span>
@@ -210,6 +257,7 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
         <Pill tone={it.state === "failed" ? "bad" : TIER_TONE[it.priority.tier] ?? "mut"}>{it.state === "failed" ? "Failed" : it.resurfaced ? "Follow up" : it.priority.tier === "high" ? "High" : it.priority.tier === "medium" ? "Medium" : "Low"}</Pill>
       </span>
     </button>
+    </div>
   );
 
   return (
@@ -233,6 +281,34 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
 
       <div className="split">
         <div className="queue" aria-label="Work that needs attention">
+          {items.length > 0 && (
+            <div className="batchbar">
+              <button className="btn sm" aria-pressed={selectMode} onClick={() => { setSelectMode(!selectMode); setPicked([]); setBatchNote(null); }}>
+                {selectMode ? "Done selecting" : "Select items"}
+              </button>
+              {selectMode && <span className="s">{picked.length ? `${picked.length} selected` : "Pick items to snooze, dismiss, assign or categorize together."}</span>}
+            </div>
+          )}
+          {selectMode && picked.length > 0 && (
+            <div className="card batchtools" role="group" aria-label="Batch actions">
+              <div className="bd">
+                <label className="snooze s">Snooze
+                  <select aria-label="Snooze selected" disabled={batchBusy} value="" onChange={(e) => { const v = Number(e.target.value); if (v) void runBatch({ action: "snooze", seconds: v }, "Snoozed"); }}>
+                    <option value="">…</option>{SNOOZES.map((s) => <option key={s.seconds} value={s.seconds}>{s.label}</option>)}
+                  </select>
+                </label>
+                <button className="btn sm" disabled={batchBusy} onClick={() => void runBatch({ action: "dismiss" }, "Dismissed")}>Dismiss</button>
+                <input aria-label="Label for assign or categorize" className="lbl" placeholder="Name or label" maxLength={60} value={label} onChange={(e) => setLabel(e.target.value)} />
+                <button className="btn sm" disabled={batchBusy || !label.trim()} onClick={() => void runBatch({ action: "assign", assignee: label }, "Assigned")}>Assign</button>
+                <button className="btn sm" disabled={batchBusy || !label.trim()} onClick={() => void runBatch({ action: "categorize", category: label }, "Categorized")}>Categorize</button>
+                <div className="s grow">Approvals are reviewed one item at a time.</div>
+              </div>
+            </div>
+          )}
+          {batchNote && (
+            <div className={`banner ${batchNote.tone}`} role="status">{batchNote.text}
+              {batchNote.token && <> <button className="btn sm" onClick={() => void undoBatch(batchNote.token!)}>Undo</button></>}</div>
+          )}
           {items.length === 0 && <div className="card"><div className="bd">Nothing needs you right now.</div></div>}
           {grouped.map((g) => {
             if (!g.items.length) return null;
@@ -276,7 +352,7 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
               </div>
             </div>
           )}
-          <div className="s hint">Tips: j / k move through the queue · c captures.</div>
+          <div className="s hint">Tips: j / k move through the queue · c captures · x selects.</div>
         </div>
 
         <aside className="detail card" aria-label="Item details">

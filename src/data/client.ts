@@ -7,7 +7,8 @@ import type {
   ActivityEvent, AppCapability, AttentionItem, ConnectOutcome, ContextSource, DeploymentInspection,
   DiscoveryFinding, MissionSummary, MissionDetail, MissionTemplate, ProjectOverview, ProjectRef,
   RuntimeHealth, SidekickContext, SidekickReply, SocialMissionView, SourceProposal, TodayDetail, TodayFeed,
-  TodayItemOptions, WorkflowSummary, CaptureItem,
+  TodayItemOptions, WorkflowSummary, CaptureItem, BatchRequest, BatchResult, UndoResult, TodayNotifications,
+  NotificationPrefs,
 } from "./types";
 import * as mock from "./mock";
 import { MockToday, TodayApiError } from "./mockToday";
@@ -46,6 +47,13 @@ export interface DataClient {
   listCaptures(projectId: string, status?: string): Promise<CaptureItem[]>;
   resolveCapture(projectId: string, captureId: string, caseId: string): Promise<CaptureItem>;
   archiveCapture(projectId: string, captureId: string): Promise<CaptureItem>;
+  // Batch triage: reversible actions only (the server refuses approve). One undo token covers what succeeded.
+  batchToday(projectId: string, req: BatchRequest): Promise<BatchResult>;
+  undoBatch(projectId: string, token: string): Promise<UndoResult>;
+  // Notifications are derived from Today; only genuinely actionable items interrupt.
+  getNotifications(projectId: string): Promise<TodayNotifications>;
+  ackNotifications(projectId: string, keys: string[]): Promise<{ acknowledged: number }>;
+  setNotificationPrefs(projectId: string, prefs: Partial<NotificationPrefs> & { clear_quiet?: boolean }): Promise<NotificationPrefs>;
 }
 
 export class MockDataClient implements DataClient {
@@ -81,8 +89,9 @@ export class MockDataClient implements DataClient {
   async getActivity() { return mock.ACTIVITY; }
   async getDeploymentInspection() { return mock.DEPLOYMENT_INSPECTION; }
   async getSocialIntelligence() { return mock.SOCIAL_INTELLIGENCE; }
-  private today = new MockToday();
-  async getToday() { return this.today.feed(); }
+  private today: MockToday;
+  constructor(clock?: () => number) { this.today = new MockToday(clock); }
+  async getToday(_p?: string) { return this.today.feed(); }
   async getTodayItem(_p: string, id: string, o?: TodayItemOptions) { return this.today.item(id, o); }
   async approveToday(_p: string, id: string, req: { payload_digest: string; targets?: string[]; identity_id?: string }) { return this.today.approve(id, req); }
   async snoozeToday(_p: string, id: string, seconds: number) { return this.today.snooze(id, seconds); }
@@ -92,6 +101,11 @@ export class MockDataClient implements DataClient {
   async listCaptures(_p: string, status?: string) { return this.today.listCaptures(status); }
   async resolveCapture(_p: string, id: string, caseId: string) { return this.today.resolveCapture(id, caseId); }
   async archiveCapture(_p: string, id: string) { return this.today.archiveCapture(id); }
+  async batchToday(_p: string, req: BatchRequest) { return this.today.batch(req); }
+  async undoBatch(_p: string, token: string) { return this.today.undo(token); }
+  async getNotifications(_p?: string) { return this.today.notifications(); }
+  async ackNotifications(_p: string, keys: string[]) { return this.today.ack(keys); }
+  async setNotificationPrefs(_p: string, prefs: Partial<NotificationPrefs> & { clear_quiet?: boolean }) { return this.today.setPrefs(prefs); }
   async askSidekick(ctx: SidekickContext, text: string) { return scriptedReply(ctx, text); }
   async proposeSource(projectId: string, text: string) { return scriptedSourceProposal(projectId, text); }
   async confirmSources(_projectId: string, sources: SourceProposal["sources"]) {
@@ -204,7 +218,7 @@ export class HttpDataClient implements DataClient {
   }
   // Today calls carry a per-tab session id so an anonymous demo gets its own sandbox ledger server-side.
   private session = newSession();
-  private async today<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+  private async today<T>(method: "GET" | "POST" | "PUT", path: string, body?: unknown): Promise<T> {
     const r = await fetch(this.base.replace(/\/$/, "") + path, {
       method, headers: { Accept: "application/json", "X-Demo-Session": this.session, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -233,6 +247,11 @@ export class HttpDataClient implements DataClient {
   listCaptures(id: string, status?: string) { return this.today<CaptureItem[]>("GET", `/api/projects/${id}/capture${status ? `?status=${encodeURIComponent(status)}` : ""}`); }
   resolveCapture(id: string, captureId: string, caseId: string) { return this.today<CaptureItem>("POST", `/api/projects/${id}/capture/${encodeURIComponent(captureId)}/resolve`, { case_id: caseId }); }
   archiveCapture(id: string, captureId: string) { return this.today<CaptureItem>("POST", `/api/projects/${id}/capture/${encodeURIComponent(captureId)}/archive`, {}); }
+  batchToday(id: string, req: BatchRequest) { return this.today<BatchResult>("POST", `/api/projects/${id}/today/batch`, req); }
+  undoBatch(id: string, token: string) { return this.today<UndoResult>("POST", `/api/projects/${id}/today/batch/undo`, { token }); }
+  getNotifications(id: string) { return this.today<TodayNotifications>("GET", `/api/projects/${id}/today/notifications`); }
+  ackNotifications(id: string, keys: string[]) { return this.today<{ acknowledged: number }>("POST", `/api/projects/${id}/today/notifications/ack`, { keys }); }
+  setNotificationPrefs(id: string, prefs: Partial<NotificationPrefs> & { clear_quiet?: boolean }) { return this.today<NotificationPrefs>("PUT", `/api/projects/${id}/today/notification-prefs`, prefs); }
   askSidekick(ctx: SidekickContext, text: string) { return this.post<SidekickReply>("/api/sidekick", { ctx, text }); }
   proposeSource(projectId: string, text: string) { return this.post<SourceProposal>("/api/sources/propose", { project_id: projectId, text }); }
   confirmSources(projectId: string, sources: SourceProposal["sources"], confirmedBy: string) {
