@@ -1,26 +1,41 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DataClient } from "../data/client";
 import type { NotificationPrefs, TodayNotifications } from "../data/types";
+import { classifyConnectionError, type ConnectionProblem } from "../data/client";
 
 // Notifications are DERIVED from Today (same stable ids and state, no second workflow). The server decides what is
 // actionable, what is already acknowledged, and what quiet hours suppress; this hook only polls and relays.
 // A snoozed item is silent until it wakes. The window title uses the content-free summary only.
 export function useNotifications(client: DataClient, projectId = "customer-ops", intervalMs = 30_000) {
   const [state, setState] = useState<TodayNotifications | null>(null);
+  // null = reachable. Otherwise why not — shown as a slim banner while the last known state stays on screen.
+  const [problem, setProblem] = useState<ConnectionProblem | null>(null);
+  const failures = useRef(0);
   const live = useRef(true);
   useEffect(() => () => { live.current = false; }, []);
 
   const refresh = useCallback(async () => {
-    try { const n = await client.getNotifications(projectId); if (live.current) setState(n); return n; }
-    catch { return null; }                      // notifications are best-effort; Today itself still works
+    try {
+      const n = await client.getNotifications(projectId);
+      failures.current = 0;
+      if (live.current) { setState(n); setProblem(null); }
+      return n;
+    } catch (e) {
+      // best-effort for notifications themselves, but the failure IS the earliest signal that the runtime is gone;
+      // report it only after two in a row so one dropped request doesn't flash a banner.
+      failures.current += 1;
+      if (live.current && failures.current >= 2) setProblem(classifyConnectionError(e));
+      return null;
+    }
   }, [client, projectId]);
 
   useEffect(() => {
     void refresh();
     if (intervalMs <= 0) return;
-    const t = setInterval(() => { if (typeof document === "undefined" || document.visibilityState !== "hidden") void refresh(); }, intervalMs);
+    // while the runtime is unreachable, retry sooner (5s) so the UI recovers by itself when it comes back
+    const t = setInterval(() => { if (typeof document === "undefined" || document.visibilityState !== "hidden") void refresh(); }, problem?.retryable ? Math.min(intervalMs, 5_000) : intervalMs);
     return () => clearInterval(t);
-  }, [refresh, intervalMs]);
+  }, [refresh, intervalMs, problem?.retryable]);
 
   useEffect(() => {
     if (!state) return;
@@ -40,5 +55,5 @@ export function useNotifications(client: DataClient, projectId = "customer-ops",
     return p;
   }, [client, projectId, refresh]);
 
-  return { state, refresh, ack, setPrefs };
+  return { state, problem, refresh, ack, setPrefs };
 }

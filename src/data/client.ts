@@ -177,22 +177,64 @@ export function scriptedReply(ctx: SidekickContext, text: string): SidekickReply
   return { text: "I can turn that into a governed Mission across your connected apps. Want me to propose the steps?" };
 }
 
+// The demo sandbox is keyed by this id. It is kept in localStorage (not sessionStorage) so that restarting the desktop
+// app — or reopening a browser — reconnects to the SAME server-side ledger instead of starting an empty one. A real
+// deployment keys state by authenticated tenant + actor instead; this id then carries no authority at all.
 function newSession(): string {
-  try {
-    const k = "redevops.today.session";
-    const have = sessionStorage.getItem(k);
-    if (have) return have;
-    const id = Math.random().toString(36).slice(2, 12);
-    sessionStorage.setItem(k, id);
-    return id;
-  } catch { return Math.random().toString(36).slice(2, 12); }     // storage can be blocked; a per-load id still isolates
+  const k = "redevops.today.session";
+  const fresh = () => Math.random().toString(36).slice(2, 12);
+  for (const store of ["localStorage", "sessionStorage"] as const) {
+    try {
+      const s = window[store]; const have = s.getItem(k);
+      if (have) return have;
+      const id = fresh(); s.setItem(k, id); return id;
+    } catch { /* this store is blocked; try the next */ }
+  }
+  return fresh();                                                    // a per-load id still isolates
+}
+
+// ── one request path: timeouts and failures become typed errors the UI can explain ─────────────────────────────────
+const REQUEST_TIMEOUT_MS = 15_000;
+async function request(url: string, init: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try { return await fetch(url, { ...init, signal: ctl.signal }); }
+  catch (e) {
+    if ((e as Error)?.name === "AbortError") throw new TodayApiError(0, "timeout", "The runtime took too long to answer.");
+    throw new TodayApiError(0, "network", "Can't reach the runtime.");
+  } finally { clearTimeout(timer); }
+}
+async function failure(r: Response, path: string): Promise<TodayApiError> {
+  let code = "error", msg = `Projects API ${path} → ${r.status}`;
+  try { const d = (await r.json())?.detail; if (d && typeof d === "object") { code = d.error ?? code; msg = d.detail ?? msg; } } catch { /* keep the generic message */ }
+  return new TodayApiError(r.status, code, msg);
+}
+
+export type ConnectionKind = "unavailable" | "unauthenticated" | "incompatible" | "unsupported" | "error";
+export interface ConnectionProblem { kind: ConnectionKind; title: string; detail: string; retryable: boolean }
+// The same words in the browser and the desktop shell. "Unavailable" is the only retryable-by-waiting state.
+export function classifyConnectionError(e: unknown): ConnectionProblem {
+  // Only a typed API/transport failure can say anything about the runtime. An unrelated bug must not claim an outage.
+  if (!(e instanceof TodayApiError)) return { kind: "error", retryable: true, title: "Something went wrong", detail: (e as Error)?.message || String(e) };
+  const a = e, status = a.status, code = a.code;
+  if (status === 0 || (status >= 500 && status !== 501))
+    return { kind: "unavailable", retryable: true, title: "The runtime isn't responding",
+             detail: "Your work is safe — everything is saved on the server. We'll keep trying and this will refresh by itself." };
+  if (status === 401 || status === 403)
+    return { kind: "unauthenticated", retryable: false, title: "This deployment didn't accept your sign-in",
+             detail: "Check the connection settings or ask your administrator for access. Nothing was changed." };
+  if (status === 501) return { kind: "unsupported", retryable: false, title: "This deployment doesn't provide this feature", detail: a.message || "" };
+  if (status === 404 && code === "error")
+    return { kind: "incompatible", retryable: false, title: "This deployment is out of date",
+             detail: "It doesn't have the Today feed yet. Update the runtime, then reconnect." };
+  return { kind: "error", retryable: true, title: "Something went wrong", detail: a.message };
 }
 
 export class HttpDataClient implements DataClient {
   constructor(private base: string) {}
   private async get<T>(path: string): Promise<T> {
-    const r = await fetch(this.base.replace(/\/$/, "") + path, { headers: { Accept: "application/json" } });
-    if (!r.ok) throw new Error(`Projects API ${path} → ${r.status}`);
+    const r = await request(this.base.replace(/\/$/, "") + path, { headers: { Accept: "application/json" } });
+    if (!r.ok) throw await failure(r, path);
     return (await r.json()) as T;
   }
   listProjects() { return this.get<ProjectRef[]>("/api/projects"); }
@@ -210,24 +252,20 @@ export class HttpDataClient implements DataClient {
   getDeploymentInspection(id: string) { return this.get<DeploymentInspection>(`/api/projects/${id}/deployment-inspection`); }
   getSocialIntelligence(id: string) { return this.get<SocialMissionView>(`/api/projects/${id}/social-intelligence`); }
   private async post<T>(path: string, body: unknown): Promise<T> {
-    const r = await fetch(this.base.replace(/\/$/, "") + path, {
+    const r = await request(this.base.replace(/\/$/, "") + path, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     });
-    if (!r.ok) throw new Error(`Projects API ${path} → ${r.status}`);
+    if (!r.ok) throw await failure(r, path);
     return (await r.json()) as T;
   }
   // Today calls carry a per-tab session id so an anonymous demo gets its own sandbox ledger server-side.
   private session = newSession();
   private async today<T>(method: "GET" | "POST" | "PUT", path: string, body?: unknown): Promise<T> {
-    const r = await fetch(this.base.replace(/\/$/, "") + path, {
+    const r = await request(this.base.replace(/\/$/, "") + path, {
       method, headers: { Accept: "application/json", "X-Demo-Session": this.session, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    if (!r.ok) {
-      let code = "error", msg = `Projects API ${path} → ${r.status}`;
-      try { const d = (await r.json())?.detail; if (d && typeof d === "object") { code = d.error ?? code; msg = d.detail ?? msg; } } catch { /* keep the generic message */ }
-      throw new TodayApiError(r.status, code, msg);
-    }
+    if (!r.ok) throw await failure(r, path);
     return (await r.json()) as T;
   }
   getToday(id: string) { return this.today<TodayFeed>("GET", `/api/projects/${id}/today`); }
