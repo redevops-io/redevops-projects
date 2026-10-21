@@ -2,7 +2,7 @@
 // can exercise the same rules the server enforces: the approval binds an exact digest (stale → 409), a repeat
 // approve never re-sends, a failed send is `failed` (never done) and needs a fresh digest, recipients without
 // consent are excluded, an ambiguous identity blocks the send, a send alone never closes work.
-import type { CaptureItem, TodayDetail, TodayFeed, TodayItem, TodayItemOptions, TodayLifecycle, TodayState } from "./types";
+import type { BatchRequest, BatchResult, CaptureItem, NotificationPrefs, TodayNotifications, UndoResult, TodayDetail, TodayFeed, TodayItem, TodayItemOptions, TodayLifecycle, TodayState } from "./types";
 
 export class TodayApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
@@ -14,7 +14,7 @@ interface Case {
   channel: string; targets: Target[]; subject: string; body: string; outcome: string; deadlineDays: number | null;
   evidence: { kind: string; label: string; observed_at: number; ref: string }[];
   connectorOk: boolean; identities: { id: string; label: string; email: string; detail: string }[];
-  topics: string[]; surfaced: boolean;
+  topics: string[]; surfaced: boolean; owner: string; category: string;
   // ledger
   attempt: number; phase: "suggested" | "sent" | "failed" | "outcome" | "dismissed";
   snoozedUntil: number; followUpAt: number; sentDigest: string; sends: number; failure: string; verified: boolean;
@@ -26,7 +26,7 @@ const hash = (s: string) => { let h = 5381; for (let i = 0; i < s.length; i++) h
 
 function seed(now: number): Case[] {
   const ev = (kind: string, label: string, ago: number, ref: string) => ({ kind, label, observed_at: now - ago, ref });
-  const base = { attempt: 0, phase: "suggested" as const, snoozedUntil: 0, followUpAt: 0, sentDigest: "", sends: 0, failure: "", verified: false, history: [{ at: now, kind: "suggested", text: "Suggested from connected channels" }], receiptId: "", connectorOk: true, identities: [] as Case["identities"], topics: [] as string[], surfaced: true };
+  const base = { attempt: 0, phase: "suggested" as const, snoozedUntil: 0, followUpAt: 0, sentDigest: "", sends: 0, failure: "", verified: false, history: [{ at: now, kind: "suggested", text: "Suggested from connected channels" }], receiptId: "", connectorOk: true, identities: [] as Case["identities"], topics: [] as string[], surfaced: true, owner: "You", category: "" };
   return [
     { ...base, id: "case-travel", domain: "travel", title: "Visa documents missing — Taylor trip", reason: "Departure in 8 days; the passport scan and visa form have not been received.", tier: "high", score: 0.95, channel: "whatsapp", deadlineDays: 8,
       targets: [{ id: "taylor", label: "Taylor Brooks", address: "+1 555 0101", consent: true }], subject: "", body: "Hi Taylor — to finish your visa we still need a clear passport scan and the signed visa form. Could you send them by Friday? Thanks!", outcome: "Documents received and validated",
@@ -48,7 +48,7 @@ function seed(now: number): Case[] {
   ];
 }
 
-interface Reminder { id: string; text: string; due: number; captureId: string; created: number; done: boolean; snoozedUntil: number }
+interface Reminder { id: string; text: string; due: number; captureId: string; created: number; done: boolean; snoozedUntil: number; owner: string; category: string }
 const STOP = new Set(["the", "a", "an", "and", "or", "to", "of", "for", "on", "in", "at", "is", "it", "my", "me", "i", "we", "they", "he", "she", "this", "that", "has", "have", "had", "not", "yet", "still", "send", "remind"]);
 const WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 const words = (s: string) => (s.toLowerCase().match(/[a-z0-9#-]+/g) ?? []);
@@ -106,7 +106,7 @@ export class MockToday {
       id: c.id, kind: "case", user_title: c.title, reason: s.reason, state: s.state, resurfaced: s.resurfaced, simulated: true, domain: c.domain, channel: c.channel,
       priority: { tier: c.tier, score: c.score, reason: s.reason, policy_version: "static-0" },
       next_action: { capability_id: "personal_agent.connected_app_action", plain_language_label: c.phase === "sent" ? "Follow up" : `Send ${c.channel} message`, preview_ref: null, executable: true },
-      lifecycle, deadline: c.deadlineDays == null ? null : this.clock() + c.deadlineDays * DAY, owner: "You", source_refs: c.evidence.map((e) => e.ref), evidence_refs: c.evidence.map((e) => e.ref),
+      lifecycle, deadline: c.deadlineDays == null ? null : this.clock() + c.deadlineDays * DAY, owner: c.owner, category: c.category, epoch: Math.floor(Math.max(c.snoozedUntil, c.followUpAt)) + 1000 * c.attempt, source_refs: c.evidence.map((e) => e.ref), evidence_refs: c.evidence.map((e) => e.ref),
       confidence: null, stale: false, status_line: status, approval_ref: c.sends ? "xapr_mock" : null, last_receipt_ref: c.receiptId || null, verification_ref: c.verified ? c.sentDigest : null, outcome_ref: c.phase === "outcome" ? `outcome:${c.id}` : null,
     };
   }
@@ -192,7 +192,7 @@ export class MockToday {
       priority: { tier: "medium", score: 0.6, reason, policy_version: "static-0" },
       next_action: { capability_id: null, plain_language_label: "Mark done", preview_ref: null, executable: false },
       lifecycle: { suggested: true, approved: false, sent: false, delivery_verified: false, outcome_observed: false },
-      deadline: r.due, owner: "You", source_refs: ["capture:" + r.captureId], evidence_refs: ["capture:" + r.captureId], confidence: null, stale: false,
+      deadline: r.due, owner: r.owner, category: r.category, epoch: Math.floor(Math.max(r.snoozedUntil, r.due)), source_refs: ["capture:" + r.captureId], evidence_refs: ["capture:" + r.captureId], confidence: null, stale: false,
       approval_ref: null, last_receipt_ref: null, verification_ref: null, outcome_ref: null };
   }
   private entities(): string[] {
@@ -233,7 +233,7 @@ export class MockToday {
       if (due == null) ask("When should I remind you?", [], "reminder");
       else {
         const body = text.replace(/^\s*(please\s+)?remind me\s+(to|about|that)?\s*/i, "").trim(); const rid = "rem-" + id;
-        this.reminders.push({ id: rid, text: body, due, captureId: id, created: now, done: false, snoozedUntil: 0 });
+        this.reminders.push({ id: rid, text: body, due, captureId: id, created: now, done: false, snoozedUntil: 0, owner: "You", category: "" });
         item.status = "classified"; item.linked_entity_refs = [rid]; item.suggested_action = { kind: "reminder", due };
         item.routing = { kind: "reminder", item_id: rid, due, in_today_now: due <= now };
       }
@@ -268,5 +268,86 @@ export class MockToday {
     const c = this.captures.find((x) => x.id === id);
     if (!c) throw new TodayApiError(404, "not_found", "no such capture");
     c.status = "archived"; return { ...c };
+  }
+
+  // ── Batch triage + notifications (mirror agentic_os/today.py) ──
+  private undoStore = new Map<string, { snaps: { id: string; before: Record<string, unknown>; after: Record<string, unknown> }[]; expires: number; action: BatchRequest["action"] }>();
+  private seen = new Map<string, number>();
+  private prefs: NotificationPrefs = { enabled: true, quiet_start: null, quiet_end: null, tz_offset_minutes: 0 };
+  private touch(id: string): { obj: Record<string, unknown>; fields: string[] } {
+    const r = this.reminders.find((x) => x.id === id);
+    if (r) return { obj: r as unknown as Record<string, unknown>, fields: ["done", "snoozedUntil", "owner", "category"] };
+    const c = this.cases.find((x) => x.id === id && x.surfaced);
+    if (c) return { obj: c as unknown as Record<string, unknown>, fields: ["phase", "snoozedUntil", "owner", "category"] };
+    throw new TodayApiError(409, "not_changeable", "this isn't an item that can be changed here (live signals are resolved where they originate)");
+  }
+  batch(req: BatchRequest): BatchResult {
+    if (!["snooze", "dismiss", "assign", "categorize"].includes(req.action)) throw new TodayApiError(422, "batch_not_allowed", "only reversible actions (snooze, dismiss, assign, categorize) can be done in a batch; approvals are reviewed one item at a time");
+    const ids = [...new Set(req.item_ids)];
+    if (!ids.length) throw new TodayApiError(422, "empty_batch", "select at least one item");
+    if (ids.length > 50) throw new TodayApiError(422, "too_many", "a batch is limited to 50 items");
+    if (req.action === "snooze" && !(req.seconds != null && req.seconds >= 60 && req.seconds <= 30 * DAY)) throw new TodayApiError(422, "bad_snooze", "snooze must be between 1 minute and 30 days");
+    const label = (req.action === "assign" ? req.assignee : req.category)?.trim() ?? "";
+    if ((req.action === "assign" || req.action === "categorize") && (!label || label.length > (req.action === "assign" ? 60 : 40) || /[\u0000-\u001f]/.test(label))) throw new TodayApiError(422, "bad_label", "that label isn't valid");
+    const results: BatchResult["results"] = [], snaps: { id: string; before: Record<string, unknown>; after: Record<string, unknown> }[] = [];
+    for (const id of ids) {
+      try {
+        const { obj, fields } = this.touch(id);
+        const before = Object.fromEntries(fields.map((f) => [f, obj[f]]));
+        if (req.action === "snooze") this.snooze(id, req.seconds!);
+        else if (req.action === "dismiss") this.dismiss(id);
+        else if (req.action === "assign") obj.owner = label;
+        else obj.category = label;
+        snaps.push({ id, before, after: Object.fromEntries(fields.map((f) => [f, obj[f]])) });
+        results.push({ id, ok: true });
+      } catch (e) { const a = e as TodayApiError; results.push({ id, ok: false, error: a.code, detail: a.message }); }
+    }
+    const now = this.clock(); let undo: BatchResult["undo"] = null;
+    if (snaps.length) { const token = `undo_${this.undoStore.size + 1}_${Math.floor(now)}`; this.undoStore.set(token, { snaps, expires: now + 600, action: req.action }); undo = { token, expires_at: now + 600 }; }
+    const ok = results.filter((r) => r.ok).length;
+    return { action: req.action, results, ok_count: ok, failed_count: results.length - ok, undo };
+  }
+  undo(token: string): UndoResult {
+    const e = this.undoStore.get(token); this.undoStore.delete(token);
+    if (!e || e.expires <= this.clock()) throw new TodayApiError(404, "undo_unavailable", "this undo has expired or was already used");
+    const results = e.snaps.map(({ id, before, after }) => {
+      const obj = (this.reminders.find((x) => x.id === id) ?? this.cases.find((x) => x.id === id)) as unknown as Record<string, unknown> | undefined;
+      if (!obj) return { id, restored: false, reason: "gone" };
+      if (Object.entries(after).some(([f, v]) => obj[f] !== v)) return { id, restored: false, reason: "changed_since" };
+      Object.assign(obj, before); return { id, restored: true };
+    });
+    return { action: e.action, results, restored_count: results.filter((r) => r.restored).length };
+  }
+  private quietNow(now: number): boolean {
+    const { quiet_start: s, quiet_end: e, tz_offset_minutes: tz } = this.prefs;
+    if (s == null || e == null || s === e) return false;
+    const hour = (((Math.floor((now + tz * 60) / 3600)) % 24) + 24) % 24;
+    return s < e ? hour >= s && hour < e : hour >= s || hour < e;
+  }
+  notifications(): TodayNotifications {
+    const feed = this.feed(); const now = feed.generated_at;
+    const actionable = feed.items.filter((i) => i.state === "needs_action");
+    const quiet = this.quietNow(now);
+    const pending = actionable.map((it) => ({ key: `${it.id}:${it.epoch ?? 0}:${it.state}`, id: it.id, title: it.user_title, reason: it.reason, kind: it.kind, resurfaced: !!it.resurfaced }))
+      .filter((p) => !this.seen.has(p.key));
+    const n = actionable.length, silenced = quiet || !this.prefs.enabled;
+    return { generated_at: now, count: n, summary: n ? `${n} thing${n === 1 ? "" : "s"} need${n === 1 ? "s" : ""} you` : "Nothing needs you", pending: silenced ? [] : pending, suppressed: silenced ? pending.length : 0, quiet_now: quiet, prefs: { ...this.prefs } };
+  }
+  ack(keys: string[]) {
+    if (keys.length > 100 || keys.some((k) => typeof k !== "string" || k.length > 120)) throw new TodayApiError(422, "bad_keys", "acknowledge up to 100 notification keys");
+    keys.forEach((k) => this.seen.set(k, this.clock()));
+    while (this.seen.size > 1000) this.seen.delete(this.seen.keys().next().value as string);
+    return { acknowledged: keys.length };
+  }
+  setPrefs(p: Partial<NotificationPrefs> & { clear_quiet?: boolean }): NotificationPrefs {
+    if (p.enabled != null) this.prefs.enabled = p.enabled;
+    if (p.tz_offset_minutes != null) { if (p.tz_offset_minutes < -840 || p.tz_offset_minutes > 840) throw new TodayApiError(422, "bad_prefs", "tz_offset_minutes must be within +/-14h"); this.prefs.tz_offset_minutes = p.tz_offset_minutes; }
+    if (p.clear_quiet) this.prefs.quiet_start = this.prefs.quiet_end = null;
+    else if (p.quiet_start != null || p.quiet_end != null) {
+      const ok = (v: unknown) => typeof v === "number" && v >= 0 && v <= 23;
+      if (!ok(p.quiet_start) || !ok(p.quiet_end)) throw new TodayApiError(422, "bad_prefs", "quiet hours need a start and an end hour, 0-23");
+      this.prefs.quiet_start = p.quiet_start!; this.prefs.quiet_end = p.quiet_end!;
+    }
+    return { ...this.prefs };
   }
 }

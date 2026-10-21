@@ -11,7 +11,7 @@ describe("Activity (P8 event ledger)", () => {
     await waitFor(() => expect(screen.getByText(/requested approval/)).toBeTruthy());
 
     // filtering to Discovery keeps discovery events, hides governance-only ones
-    fireEvent.click(screen.getByRole("button", { name: "Discovery" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Discovery" }));
 
     expect(screen.getByText(/Discovery linked customer evidence/)).toBeTruthy();
     expect(screen.queryByText(/requested approval/)).toBeNull();

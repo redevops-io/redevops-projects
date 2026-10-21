@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import "./styles.css";
-import { Rail, type Section } from "./components/Rail";
+import { Rail } from "./components/Rail";
+import { SectionTabs } from "./components/SectionTabs";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { NotificationToasts } from "./components/NotificationToasts";
+import { useNotifications } from "./hooks/useNotifications";
+import type { Section } from "./nav";
 import { Topbar } from "./components/Topbar";
 import { Sidekick, type SidekickSeed } from "./components/Sidekick";
 import { Today } from "./views/Today";
@@ -31,6 +36,8 @@ export function App({ client }: { client?: DataClient }) {
   const [section, setSection] = useState<Section>("today");
   const [overview, setOverview] = useState<ProjectOverview | null>(null);
   const [todayCount, setTodayCount] = useState<number | undefined>(undefined);
+  const [focusItem, setFocusItem] = useState<string | null>(null);
+  const notif = useNotifications(api);
   const [skOpen, setSkOpen] = useState(false);
   const [skSeed, setSkSeed] = useState<SidekickSeed | null>(null);
 
@@ -54,7 +61,7 @@ export function App({ client }: { client?: DataClient }) {
 
   function view() {
     switch (section) {
-      case "today": return <Today client={api} go={setSection} onCount={setTodayCount} />;
+      case "today": return <Today client={api} go={setSection} onCount={setTodayCount} focusItem={focusItem} onFocused={() => setFocusItem(null)} />;
       case "overview":
         return overview
           ? <Overview data={overview} go={setSection} />
@@ -69,18 +76,22 @@ export function App({ client }: { client?: DataClient }) {
       case "sources": return <Sources client={api} go={setSection} />;
       case "apps": return <Apps client={api} go={setSection} />;
       case "activity": return <Activity client={api} go={setSection} />;
-      case "settings": return <Settings client={api} go={setSection} />;
+      case "settings": return <Settings client={api} go={setSection} onPrefsChanged={() => void notif.refresh()} />;
     }
   }
 
   return (
     <div className="app">
       <a className="skip" href="#main">Skip to content</a>
-      <Rail section={section} onNavigate={setSection} badges={todayCount === undefined ? undefined : { today: todayCount }} />
+      <Rail section={section} onNavigate={setSection} badges={{ today: notif.state?.count ?? todayCount ?? 0 }} />
       <div className="main" id="main" tabIndex={-1}>
         <Topbar project={overview?.project ?? null} onAsk={(t) => askSidekick(t, true)} onOpen={() => setSkOpen(true)} />
-        {view()}
+        <SectionTabs section={section} onNavigate={setSection} />
+        <ErrorBoundary resetKey={section}>{view()}</ErrorBoundary>
       </div>
+      <NotificationToasts pending={notif.state?.pending ?? []}
+        onOpen={(n) => { setSection("today"); setFocusItem(n.id); void notif.ack([n.key]); }}
+        onDismiss={(n) => void notif.ack([n.key])} onDismissAll={() => void notif.ack((notif.state?.pending ?? []).map((p) => p.key))} />
       <Sidekick open={skOpen} ctx={ctx} client={api} seed={skSeed} onClose={() => setSkOpen(false)}
         go={(s) => { setSection(s); setSkOpen(false); }} />
     </div>

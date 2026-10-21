@@ -39,9 +39,9 @@ export function Activity({ client }: { client: DataClient; go: (s: Section) => v
         <h1 className="h">Activity</h1>
       </div>
 
-      <div className="tabsrow">
+      <div className="tabsrow" role="tablist">
         {FILTERS.map((f) => (
-          <button key={f.id} aria-selected={f.id === filter} onClick={() => setFilter(f.id)}>{f.label}</button>
+          <button role="tab" key={f.id} aria-selected={f.id === filter} onClick={() => setFilter(f.id)}>{f.label}</button>
         ))}
       </div>
 

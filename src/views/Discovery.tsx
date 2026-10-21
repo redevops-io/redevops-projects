@@ -37,9 +37,9 @@ export function Discovery({ client, go }: { client: DataClient; go: (s: Section)
         <h1 className="h">Discovery</h1>
       </div>
 
-      <div className="tabsrow">
+      <div className="tabsrow" role="tablist">
         {TABS.map((t) => (
-          <button key={t} aria-selected={t === tab} onClick={() => setTab(t)}>{t}</button>
+          <button role="tab" key={t} aria-selected={t === tab} onClick={() => setTab(t)}>{t}</button>
         ))}
       </div>
 

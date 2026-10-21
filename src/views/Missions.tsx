@@ -110,9 +110,9 @@ export function Missions({ client, ask }: { client: DataClient; go: (s: Section)
           <h1 className="h">{selected.title}</h1>
         </div>
 
-        <div className="tabsrow">
+        <div className="tabsrow" role="tablist">
           {DETAIL_TABS.map((t, i) => (
-            <button key={t} aria-selected={i === activeTab} onClick={() => setActiveTab(i)}>{t}</button>
+            <button role="tab" key={t} aria-selected={i === activeTab} onClick={() => setActiveTab(i)}>{t}</button>
           ))}
         </div>
 
@@ -226,9 +226,9 @@ export function Missions({ client, ask }: { client: DataClient; go: (s: Section)
         <h1 className="h">Everything running, waiting, and scheduled</h1>
       </div>
 
-      <div className="tabsrow">
+      <div className="tabsrow" role="tablist">
         {FILTERS.map((f) => (
-          <button key={f.id} aria-selected={f.id === filter} onClick={() => setFilter(f.id)}>{f.label}</button>
+          <button role="tab" key={f.id} aria-selected={f.id === filter} onClick={() => setFilter(f.id)}>{f.label}</button>
         ))}
       </div>
 

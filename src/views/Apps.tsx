@@ -180,9 +180,9 @@ export function Apps({ client, go }: { client: DataClient; go: (s: Section) => v
         </div>
       </div>
 
-      <div className="tabsrow">
+      <div className="tabsrow" role="tablist">
         {TABS.map((t) => (
-          <button key={t.id} aria-selected={t.id === tab} onClick={() => setTab(t.id)}>{t.label}</button>
+          <button role="tab" key={t.id} aria-selected={t.id === tab} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
 

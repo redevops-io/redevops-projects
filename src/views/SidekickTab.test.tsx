@@ -10,7 +10,7 @@ describe("SidekickTab (doc §2)", () => {
   it("surfaces mission templates with a not-ready dependency", async () => {
     render(<SidekickTab client={new MockDataClient()} go={() => {}} ctx={CTX} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Mission templates" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Mission templates" }));
 
     // The refunds template goal renders.
     await waitFor(() => expect(screen.getByText("Handle customer refunds")).toBeTruthy());
@@ -34,7 +34,7 @@ describe("SidekickTab (doc §2)", () => {
 
   it("connects a missing dependency and readiness updates", async () => {
     render(<SidekickTab client={new MockDataClient()} go={() => {}} ctx={CTX} />);
-    fireEvent.click(screen.getByRole("button", { name: "Mission templates" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Mission templates" }));
 
     const connectGmail = await screen.findByRole("button", { name: "Connect Gmail" });
     fireEvent.click(connectGmail);

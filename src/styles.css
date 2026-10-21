@@ -196,3 +196,31 @@ ol.steps li{margin:4px 0}
 .capture input::placeholder{color:var(--muted)}
 .capture input:focus-visible{border-color:var(--accent)}
 .intake .opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+
+/* ---- navigation: five places ---- */
+.rail nav{display:flex;flex-direction:column;gap:2px}
+.rail .rail-bottom{margin-top:auto;border-top:1px solid rgba(255,255,255,.08);padding-top:8px}
+.rail .rail-bottom + .foot{margin-top:8px}
+.subnav{display:flex;flex-wrap:wrap;gap:4px;padding:8px 22px 0;background:var(--panel);border-bottom:1px solid var(--line)}
+.subnav button{border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13px;padding:8px 12px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.subnav button:hover{color:var(--ink)}
+.subnav button[aria-current="page"]{color:var(--accent-ink);border-bottom-color:var(--accent)}
+@media(max-width:820px){.subnav{padding:6px 14px 0}}
+
+/* ---- batch triage ---- */
+.batchbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.batchtools .bd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:12px}
+.batchtools .lbl{background:var(--panel);border:1px solid var(--line-2);border-radius:8px;padding:5px 9px;color:var(--ink);font:inherit;font-size:13px;min-width:0;flex:1 1 120px;max-width:200px}
+.batchtools select{background:var(--panel);color:var(--ink);border:1px solid var(--line-2);border-radius:8px;padding:5px 8px}
+.trowwrap{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line)} .trowwrap:first-child{border-top:0}
+.trowwrap .trow{border-top:0;flex:1;min-width:0}
+.pick{width:18px;height:18px;flex:none;accent-color:var(--accent)}
+
+/* ---- in-app notification toasts ---- */
+.toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:25;max-width:min(380px,calc(100vw - 32px))}
+.toast{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line-2);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px}
+.toast .grow{flex:1;min-width:0} .toast .t{font-weight:600;font-size:13px} .toast .s{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+@media(prefers-reduced-motion:no-preference){.toast{animation:toastin .18s ease-out}@keyframes toastin{from{transform:translateY(6px);opacity:0}to{transform:none;opacity:1}}}
+.toast.more{justify-content:space-between} .toast.more .s{color:var(--ink-2)}
+/* narrow: the icon rail is 58px wide — keep the toast stack clear of it so it never covers navigation */
+@media(max-width:820px){.toasts{left:70px;right:12px;bottom:12px;max-width:none}.toast{padding:8px 10px}}

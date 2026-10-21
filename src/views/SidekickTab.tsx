@@ -182,9 +182,9 @@ export function SidekickTab({ client, go, ctx }: { client: DataClient; go: (s: S
         Project: <b>Customer Operations</b> · Section: <b>{ctx.section}</b>{objectLine}
       </div>
 
-      <div className="tabsrow">
+      <div className="tabsrow" role="tablist">
         {TABS.map((t) => (
-          <button key={t.id} aria-selected={t.id === tab} onClick={() => setTab(t.id)}>{t.label}</button>
+          <button role="tab" key={t.id} aria-selected={t.id === tab} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
 
