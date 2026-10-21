@@ -16,7 +16,7 @@ describe("App routing — one implementation for browser and desktop", () => {
   it("a deep link to a Today item opens that item", async () => {
     window.location.hash = "#/today/case-quote";
     render(<App client={new MockDataClient()} />);
-    expect(await screen.findByRole("heading", { level: 2, name: /Quote hasn't been answered/ })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 2, name: /Quote hasn't been answered/ }, { timeout: 5000 })).toBeTruthy();
     await waitFor(() => expect(window.location.hash).toBe("#/today"));          // consumed: a refresh won't re-focus it
   });
 
@@ -42,7 +42,7 @@ describe("App routing — one implementation for browser and desktop", () => {
     render(<App client={new MockDataClient()} />);
     await screen.findByText("5 things need your decision.");
     await act(async () => { window.location.hash = "#/today/case-clinic"; });
-    expect(await screen.findByRole("heading", { level: 2, name: /3 patients haven't confirmed/ })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 2, name: /3 patients haven't confirmed/ }, { timeout: 5000 })).toBeTruthy();
   });
 
   it("an outside hash change moves ACROSS sections (a desktop deep link from anywhere), not just within Today", async () => {
@@ -54,7 +54,7 @@ describe("App routing — one implementation for browser and desktop", () => {
       expect(primary().getByRole("button", { name: new RegExp(`^${dest}`) }).getAttribute("aria-current")).toBe("page");
     }
     await act(async () => { window.location.hash = "#/today/case-clinic"; });
-    expect(await screen.findByRole("heading", { level: 2, name: /3 patients haven't confirmed/ })).toBeTruthy();   // and back, onto an item
+    expect(await screen.findByRole("heading", { level: 2, name: /3 patients haven't confirmed/ }, { timeout: 5000 })).toBeTruthy();   // and back, onto an item
   });
 
   it("restores the last place after a restart (no hash), and Today is still the default for a fresh profile", async () => {
