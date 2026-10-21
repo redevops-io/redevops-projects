@@ -302,7 +302,7 @@ export interface TodayLifecycle {
 
 export interface TodayItem {
   id: string;
-  kind: "case" | "signal";
+  kind: "case" | "signal" | "reminder";
   user_title: string;
   reason: string;
   state: TodayState;
@@ -367,3 +367,23 @@ export interface TodayDetail extends TodayItem {
   replayed?: boolean;
 }
 export interface TodayItemOptions { targets?: string[]; identityId?: string }
+
+// ── Quick Capture (agentic_os/capture.py): a durable intake. The original words are never rewritten; what the
+//    system understood is an annotation, and routing is explicit. Capturing never sends or approves anything. ──
+export type CaptureStatus = "new" | "needs_clarification" | "classified" | "archived";
+export interface CaptureItem {
+  id: string;
+  source: string;
+  content: string;                       // the user's original words
+  captured_at: number;
+  status: CaptureStatus;
+  classification: { intent: string; confidence: number; entities: string[]; method: string; reasons: string[] } | null;
+  suggested_action: { kind: string; label?: string; approval_required?: boolean; due?: number } | null;
+  question: { text: string; why: string; options: { case_id: string; label: string }[] } | null;
+  routing: { kind: "reminder" | "case" | "investigation_candidate" | "intake"; item_id?: string; title?: string; due?: number; in_today_now: boolean } | null;
+  linked_entity_refs: string[];
+  evidence_refs: string[];
+  events: { at: number; kind: string; text: string; version: number }[];
+  version: number;
+  duplicate?: boolean;
+}
