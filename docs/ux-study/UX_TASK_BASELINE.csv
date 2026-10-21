@@ -1,0 +1,8 @@
+participant,surface,screen_reader,task,completed_unassisted,assist_level,time_seconds,errors,seq_1to7,belief_correct,quotes_or_notes
+P1,browser,no,T1,,,,,,,
+P1,browser,no,T2,,,,,,,
+P1,browser,no,T3,,,,,,,
+P1,browser,no,T4,,,,,,,
+P1,browser,no,T5,,,,,,,
+P1,browser,no,T6,,,,,,,
+P1,desktop,no,T7,,,,,,,
