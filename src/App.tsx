@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import "./styles.css";
 import { Rail } from "./components/Rail";
 import { SectionTabs } from "./components/SectionTabs";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { NotificationToasts } from "./components/NotificationToasts";
 import { useNotifications } from "./hooks/useNotifications";
 import type { Section } from "./nav";
@@ -86,7 +87,7 @@ export function App({ client }: { client?: DataClient }) {
       <div className="main" id="main" tabIndex={-1}>
         <Topbar project={overview?.project ?? null} onAsk={(t) => askSidekick(t, true)} onOpen={() => setSkOpen(true)} />
         <SectionTabs section={section} onNavigate={setSection} />
-        {view()}
+        <ErrorBoundary resetKey={section}>{view()}</ErrorBoundary>
       </div>
       <NotificationToasts pending={notif.state?.pending ?? []}
         onOpen={(n) => { setSection("today"); setFocusItem(n.id); void notif.ack([n.key]); }}

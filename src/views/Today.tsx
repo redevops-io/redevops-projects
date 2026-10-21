@@ -26,6 +26,14 @@ const GROUPS: { id: string; title: string; states: TodayState[]; tone: Health }[
 const TIER_TONE: Record<string, Health> = { high: "bad", medium: "warn", low: "mut" };
 const CHANNEL: Record<string, string> = { whatsapp: "WhatsApp", sms: "SMS", email: "Email" };
 
+// Render defensively: older or partial deployments may omit lists; a missing array must never take the screen down.
+function normalizeDetail(d: Partial<TodayDetail> & TodayItem): TodayDetail {
+  return { ...d, why: d.why ?? d.reason ?? "", evidence: Array.isArray(d.evidence) ? d.evidence : [],
+    history: Array.isArray(d.history) ? d.history : [], action: d.action ?? null, receipt: d.receipt ?? null,
+    lifecycle: d.lifecycle ?? { suggested: true, approved: false, sent: false, delivery_verified: false, outcome_observed: false },
+    source_refs: Array.isArray(d.source_refs) ? d.source_refs : [] } as TodayDetail;
+}
+
 function due(deadline: number | null, now: number): string {
   if (deadline == null) return "";
   const d = deadline - now;
@@ -161,7 +169,7 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
     try {
       const d = await client.getTodayItem(PROJECT, id, { targets: t, identityId: ident });
       if (live.current) {
-        setDetail(d);
+        setDetail(normalizeDetail(d));
         if (!t && !ident) setRoster(d.action ? { to: d.action.to, skipped: d.action.skipped } : null);
       }
     } catch (e) { if (live.current) setNote({ tone: "bad", text: String((e as Error).message ?? e) }); }
@@ -211,8 +219,10 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
     try {
       const d = await fn();
       if (!live.current) return;
-      setDetail(d); setNote({ tone: d.state === "failed" ? "bad" : "ok", text: ok(d) });
-      await loadFeed();
+      // The response says what happened (state, replayed); the detail pane is always re-read from the server, so a
+      // deployment that answers an action with less than a full detail can never break the screen.
+      setNote({ tone: d.state === "failed" ? "bad" : "ok", text: ok(d) });
+      await Promise.all([loadFeed(), loadDetail(sel, targets, identity)]);
     } catch (e) {
       const ae = e as TodayApiError;
       if (ae.code === "stale_approval") {
