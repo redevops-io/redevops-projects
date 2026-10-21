@@ -289,3 +289,81 @@ export interface SocialMissionView {
   opportunity_cards: Record<string, unknown>[];
   data_source?: string;
 }
+
+// ── Today (CONTROL_SURFACES_UX plan §3): an outcome-first AttentionItem projection. Mirrors
+//    agentic_os/today.py. The UI renders these VERBATIM — it never derives state, priority, approval,
+//    verification or the payload digest itself. ──
+export type TodayState =
+  | "needs_action" | "waiting" | "scheduled" | "running" | "verified" | "failed" | "dismissed";
+
+export interface TodayLifecycle {
+  suggested: boolean; approved: boolean; sent: boolean; delivery_verified: boolean; outcome_observed: boolean;
+}
+
+export interface TodayItem {
+  id: string;
+  kind: "case" | "signal";
+  user_title: string;
+  reason: string;
+  state: TodayState;
+  priority: { tier: "high" | "medium" | "low"; score: number; reason: string; policy_version: string };
+  next_action: { capability_id: string | null; plain_language_label: string; preview_ref: string | null; executable: boolean };
+  lifecycle: TodayLifecycle;
+  deadline: number | null;
+  owner: string | null;
+  source_refs: string[];
+  evidence_refs: string[];
+  confidence: number | null;
+  stale: boolean;
+  resurfaced?: boolean;
+  simulated?: boolean;
+  domain?: string;
+  channel?: string;
+  status_line?: string;
+  source_app?: string;
+  risk_tier?: string;
+  requires_approval?: boolean;
+  approval_ref: string | null;
+  last_receipt_ref: string | null;
+  verification_ref: string | null;
+  outcome_ref: string | null;
+}
+
+export interface TodayFeed {
+  project_id: string;
+  generated_at: number;
+  basis: string;                       // "sample" | "unavailable" | …
+  simulated_actions: boolean;
+  headline: string;
+  counts: Partial<Record<TodayState, number>>;
+  items: TodayItem[];
+  handled_automatically: number;
+  abstained: number;
+}
+
+export interface TodayRecipient { id: string; label: string; address: string }
+export interface TodayAction {
+  kind: "send_message";
+  channel: string;
+  to: TodayRecipient[];
+  skipped: { id: string; label: string; reason: string }[];
+  subject: string;
+  body: string;
+  payload_digest: string | null;       // what an approval binds; null until the action is sendable
+  attempt: number;
+  will_happen: string;
+  nothing_sent_yet: boolean;
+  policy: { decision: string; reason: string };
+  blocked_reason: string;
+  disambiguate: { id: string; label: string; email: string; detail: string }[];
+  can_approve: boolean;
+}
+export interface TodayDetail extends TodayItem {
+  why: string;
+  evidence: { kind: string; label: string; observed_at: number; ref: string }[];
+  action: TodayAction | null;
+  history: { at: number; kind: string; text: string }[];
+  receipt: { status?: string; receipt_id?: string; provider?: string; error?: string } | null;
+  replayed?: boolean;
+}
+export interface TodayItemOptions { targets?: string[]; identityId?: string }

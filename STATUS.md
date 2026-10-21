@@ -14,6 +14,7 @@ The Projects API is owned and served by `agentic-os` (`agentic_os/projects_api.p
 
 ## Supported
 
+- **Today** (default landing): ranked queue over the agentic-os `/today` projection, item inspection (why, evidence, exact message preview), governed Approve & send bound to the reviewed payload digest, snooze/dismiss, a five-stage lifecycle (suggested → approved → sent → delivery confirmed → outcome seen), consent/identity/failure handling. Requires agentic-os with `/api/projects/:id/today` (PR redevops-io/agentic-os#497); the mock client mirrors the contract. Data and sends are sample/simulated until a deployment supplies a case source and adapter. Not yet: quick capture, batch triage, notifications. Not visually reviewed in a browser.
 - App shell (nav rail, project selector, topbar), context-aware Sidekick panel, `DataClient` seam with `MockDataClient` (standalone) and `HttpDataClient` (`VITE_PROJECTS_API`), Overview wired from the client.
 - `npm install`, `npm run dev`, `npm test`, `npm run typecheck`, `npm run build`.
 
