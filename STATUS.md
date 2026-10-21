@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Maturity | alpha / reference: P1 UI shell (of P1-P10) |
+| Maturity | alpha / reference: all 12 sections implemented in code (P1-P8 views present); P9/P10 partial |
 | Version | 0.1.0 in `package.json` (`private: true`); no tags or releases |
 | Last git activity | 2026-10-13 (`git log -1 --format=%cs`; clone is shallow) |
 | Activity | active: 29 commits between 2026-07-15 and 2026-10-15 (GitHub API) |
@@ -10,7 +10,7 @@
 
 ## Where Projects runs today
 
-The Projects capability is served by `agentic-os` (`agentic_os/projects_api.py`, "Projects UI + API"); a hosted reference is listed in the agentic-os README at <https://demo.redevops.io/projects>. This repo is the separate front-end shell.
+The Projects API is owned and served by `agentic-os` (`agentic_os/projects_api.py`, "Projects UI + API"); a hosted reference is listed in the agentic-os README at <https://demo.redevops.io/projects>. This repo is the UI source (built and vendored into agentic-os).
 
 ## Supported
 
@@ -19,11 +19,12 @@ The Projects capability is served by `agentic-os` (`agentic_os/projects_api.py`,
 
 ## Not supported / not established
 
-- P2-P10 (Mission projections, Attention, Apps, Workflows, Discovery, Overview composition, Activity, the end-to-end demo, packaging) are not done per the README.
+- Depth of P2-P8 views (Missions, Attention, Apps, Workflows, Discovery, Overview, Activity) against the original spec: not assessed; test suite not re-run for this change.
+- `/deployment-inspection` and `/social-intelligence` are called by `HttpDataClient` but not served by agentic-os `projects_api.py` (checked 2026-10-21).
 - No bundled backend; behaviour of the hosted demo is not verified here.
 
 ## Known issues
 
-- The README's "P1" status text may lag the code: `src/views/` has views and tests for Missions, Workflows, Attention, Discovery, Apps, Activity and others; their completeness was not assessed (to be confirmed by maintainers).
+- Single source of truth: this repo owns the UI source; `agentic-os/agentic_os/projects_ui/` is a stale vendored build (2026-09-09) and should not be edited. The API is owned by agentic-os.
 - Before this change the README did not say that the product capability lives in agentic-os.
 - Licence: see `LICENSE.md`.
