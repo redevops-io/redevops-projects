@@ -15,7 +15,7 @@ export function Rail({ section, onNavigate, badges }: { section: Section; onNavi
   );
   return (
     <aside className="rail">
-      <div className="brand"><span className="logo">◆</span><span className="txt">ReDevOps</span></div>
+      <div className="brand"><span className="logo" aria-hidden="true">◆</span><span className="txt">ReDevOps</span></div>
       <nav aria-label="Primary">{primary.map(btn)}</nav>
       <nav aria-label="Settings" className="rail-bottom">{secondary.map(btn)}</nav>
       <div className="foot">Projects renders truth · Sidekick proposes.</div>
