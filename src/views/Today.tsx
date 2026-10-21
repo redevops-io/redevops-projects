@@ -174,7 +174,7 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
       </div>
 
       <div className="split">
-        <div className="queue" role="list" aria-label="Work that needs attention">
+        <div className="queue" aria-label="Work that needs attention">
           {items.length === 0 && <div className="card"><div className="bd">Nothing needs you right now.</div></div>}
           {grouped.map((g) => {
             if (!g.items.length) return null;
@@ -202,7 +202,10 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
         </div>
 
         <aside className="detail card" aria-label="Item details">
-          {!detail ? <div className="bd placeholder" role="status">{sel ? "Loading…" : "Select an item."}</div> : (
+          {!detail && note ? (
+            <div className="bd"><div className={`banner ${note.tone}`} role="alert">{note.text}</div>
+              <div className="actions"><button className="btn sm" onClick={() => { if (sel) { setNote(null); void loadDetail(sel); } }}>Try again</button></div></div>
+          ) : !detail ? <div className="bd placeholder" role="status">{sel ? "Loading…" : "Select an item."}</div> : (
             <div className="bd">
               <div className="hd2">
                 <h2 className="dt">{detail.user_title}</h2>
@@ -264,7 +267,7 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
                 {act && (detail.state === "needs_action" || detail.state === "failed" || detail.state === "scheduled") && !detail.resurfaced && detail.lifecycle.sent === false && (
                   <button className="btn pri" disabled={busy || !act.can_approve}
                     onClick={() => run(() => client.approveToday(PROJECT, detail.id, { payload_digest: act.payload_digest!, targets, identity_id: identity }),
-                      (d) => d.state === "failed" ? d.status_line ?? "Not sent." : d.replayed ? "Already sent — nothing was sent again." : "Approved and sent. I'll follow up if there's no response.")}>
+                      (d) => d.state === "failed" ? d.status_line ?? "Not sent." : d.replayed ? "Already sent — nothing was sent again." : "Approved and sent. It comes back to your queue if there's no response.")}>
                     {busy ? "Working…" : detail.state === "failed" ? "Review & retry" : "Approve & send"}
                   </button>
                 )}

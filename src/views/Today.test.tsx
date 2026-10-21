@@ -127,6 +127,23 @@ describe("Today", () => {
     await screen.findByRole("heading", { level: 2, name: /Visa documents missing/ });
   });
 
+  it("shows an honest empty state, with no sample banner when the data isn't sample", async () => {
+    const client = new MockDataClient();
+    vi.spyOn(client, "getToday").mockResolvedValueOnce({ project_id: "customer-ops", generated_at: 0, basis: "live", simulated_actions: false,
+      headline: "Nothing needs you right now.", counts: {}, items: [], handled_automatically: 0, abstained: 0 });
+    setup(client);
+    expect((await screen.findAllByText("Nothing needs you right now.")).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Sample data/)).toBeNull();
+    expect(screen.getByText("Select an item.")).toBeTruthy();
+  });
+
+  it("surfaces a detail-load failure instead of hanging on Loading", async () => {
+    const client = new MockDataClient();
+    vi.spyOn(client, "getTodayItem").mockRejectedValue(new TodayApiError(500, "error", "detail exploded"));
+    setup(client);
+    expect(await screen.findByText("detail exploded")).toBeTruthy();
+  });
+
   it("shows a retryable error when the feed can't load", async () => {
     const client = new MockDataClient();
     vi.spyOn(client, "getToday").mockRejectedValueOnce(new Error("boom"));

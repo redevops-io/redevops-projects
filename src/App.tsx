@@ -75,8 +75,9 @@ export function App({ client }: { client?: DataClient }) {
 
   return (
     <div className="app">
+      <a className="skip" href="#main">Skip to content</a>
       <Rail section={section} onNavigate={setSection} badges={todayCount === undefined ? undefined : { today: todayCount }} />
-      <div className="main">
+      <div className="main" id="main" tabIndex={-1}>
         <Topbar project={overview?.project ?? null} onAsk={(t) => askSidekick(t, true)} onOpen={() => setSkOpen(true)} />
         {view()}
       </div>
