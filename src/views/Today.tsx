@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pill } from "../components/Pill";
 import type { Section } from "../nav";
-import { TodayApiError, type DataClient } from "../data/client";
+import { TodayApiError, classifyConnectionError, type DataClient } from "../data/client";
 import type { BatchRequest, CaptureItem, Health, TodayDetail, TodayFeed, TodayItem, TodayLifecycle, TodayRecipient, TodayState } from "../data/types";
 
 // Today — the default landing (CONTROL_SURFACES_UX plan §3). One ranked queue of what needs a human, in
@@ -59,6 +59,7 @@ function Stepper({ lc, failed }: { lc: TodayLifecycle; failed: boolean }) {
 export function Today({ client, go, onCount, focusItem, onFocused }: { client: DataClient; go: (s: Section) => void; onCount?: (n: number) => void; focusItem?: string | null; onFocused?: () => void }) {
   const [feed, setFeed] = useState<TodayFeed | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [detail, setDetail] = useState<TodayDetail | null>(null);
   const [targets, setTargets] = useState<string[] | undefined>(undefined);
@@ -88,12 +89,18 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
     try {
       const f = await client.getToday(PROJECT);
       if (!live.current) return f;
-      setFeed(f); setErr(null);
+      setFeed(f); setErr(null); setLoadError(null);
       onCount?.(f.counts.needs_action ?? 0);
       return f;
-    } catch (e) { if (live.current) setErr(String((e as Error).message ?? e)); return null; }
+    } catch (e) { if (live.current) { setErr(String((e as Error).message ?? e)); setLoadError(e); } return null; }
   }, [client, onCount]);
   useEffect(() => { void loadFeed(); }, [loadFeed]);
+  // A runtime that is merely down comes back by itself: retry with a gentle backoff until the first load succeeds.
+  useEffect(() => {
+    if (feed || !err || !classifyConnectionError(loadError).retryable) return;
+    const t = setTimeout(() => void loadFeed(), 5_000);
+    return () => clearTimeout(t);
+  }, [feed, err, loadError, loadFeed]);
   useEffect(() => {      // a notification opened Today on a specific item
     if (focusItem && feed?.items.some((i) => i.id === focusItem)) { setSel(focusItem); onFocused?.(); }
     else if (focusItem && feed) { void loadFeed(); }
@@ -178,8 +185,9 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
   // open the first item by default; reset the per-item choices when the selection changes
   useEffect(() => {
     if (!feed) return;
+    if (focusItem && feed.items.some((i) => i.id === focusItem)) return;        // a deep link / notification chose the item; don't override it
     if (!sel || !feed.items.some((i) => i.id === sel)) setSel(feed.items.find((i) => i.state === "needs_action")?.id ?? feed.items[0]?.id ?? null);
-  }, [feed, sel]);
+  }, [feed, sel, focusItem]);
   useEffect(() => {
     setTargets(undefined); setIdentity(undefined); setNote(null); setDetail(null); setRoster(null);
     if (sel) void loadDetail(sel);
@@ -243,11 +251,18 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
   };
   const chooseIdentity = (id: string) => { setIdentity(id); if (detail) void loadDetail(detail.id, targets, id); };
 
-  if (err && !feed) return (
-    <section className="content" role="alert"><h1 className="h">Today</h1>
-      <div className="card"><div className="bd">Couldn't load Today. <button className="btn sm" onClick={() => void loadFeed()}>Try again</button><div className="s">{err}</div></div></div>
-    </section>
-  );
+  if (err && !feed) {
+    const p = classifyConnectionError(loadError);
+    return (
+      <section className="content" role="alert"><h1 className="h">Today</h1>
+        <div className="card"><div className="bd">
+          <div className="t">{p.kind === "error" ? "Couldn't load Today" : p.title}</div>
+          <div className="s">{p.kind === "error" ? err : p.detail}</div>
+          {p.retryable && <div className="actions"><button className="btn sm" onClick={() => void loadFeed()}>Try again</button><span className="s">Retrying automatically…</span></div>}
+        </div></div>
+      </section>
+    );
+  }
   if (!feed) return <section className="content"><div className="placeholder" role="status">Loading…</div></section>;
 
   const row = (it: TodayItem) => (

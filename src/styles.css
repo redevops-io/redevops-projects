@@ -224,3 +224,9 @@ ol.steps li{margin:4px 0}
 .toast.more{justify-content:space-between} .toast.more .s{color:var(--ink-2)}
 /* narrow: the icon rail is 58px wide — keep the toast stack clear of it so it never covers navigation */
 @media(max-width:820px){.toasts{left:70px;right:12px;bottom:12px;max-width:none}.toast{padding:8px 10px}}
+
+/* ---- connection banner ---- */
+.connbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 22px;font-size:13px;border-bottom:1px solid var(--line);background:var(--warn-wash);color:var(--warn)}
+.connbar.unauthenticated,.connbar.incompatible{background:var(--bad-wash);color:var(--bad)}
+.connbar strong{font-weight:700} .connbar span{flex:1 1 240px}
+@media(max-width:820px){.connbar{padding:8px 14px}}

@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./styles.css";
 import { Rail } from "./components/Rail";
 import { SectionTabs } from "./components/SectionTabs";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { NotificationToasts } from "./components/NotificationToasts";
 import { useNotifications } from "./hooks/useNotifications";
+import { ConnectionBanner } from "./components/ConnectionBanner";
 import type { Section } from "./nav";
+import { formatHash, initialRoute, parseHash, rememberPlace } from "./route";
 import { Topbar } from "./components/Topbar";
 import { Sidekick, type SidekickSeed } from "./components/Sidekick";
 import { Today } from "./views/Today";
@@ -33,10 +35,21 @@ const SECTION_LABEL: Record<Section, string> = {
 
 export function App({ client }: { client?: DataClient }) {
   const api = useMemo(() => client ?? makeClient(), [client]);
-  const [section, setSection] = useState<Section>("today");
+  // Place comes from the URL hash (deep link / refresh), else the last place, else Today — identical in the browser and
+  // the desktop shell, which just points its window at the deployment and (for deep links) sets this hash.
+  const start = useMemo(() => initialRoute(typeof window === "undefined" ? "" : window.location.hash), []);
+  const [section, setSectionState] = useState<Section>(start.section);
+  const setSection = useCallback((s: Section, item?: string) => {
+    setSectionState(s);
+    if (typeof window !== "undefined") {
+      const h = formatHash({ section: s, item });
+      if (window.location.hash !== h) window.history.pushState(null, "", h);
+    }
+    rememberPlace(s);
+  }, []);
   const [overview, setOverview] = useState<ProjectOverview | null>(null);
   const [todayCount, setTodayCount] = useState<number | undefined>(undefined);
-  const [focusItem, setFocusItem] = useState<string | null>(null);
+  const [focusItem, setFocusItem] = useState<string | null>(start.section === "today" ? start.item ?? null : null);
   const notif = useNotifications(api);
   const [skOpen, setSkOpen] = useState(false);
   const [skSeed, setSkSeed] = useState<SidekickSeed | null>(null);
@@ -48,7 +61,17 @@ export function App({ client }: { client?: DataClient }) {
     setSkOpen(true);
   }
 
-  useEffect(() => { api.getOverview("customer-ops").then(setOverview); }, [api]);
+  useEffect(() => { api.getOverview("customer-ops").then(setOverview).catch(() => { /* the connection banner explains it */ }); }, [api]);
+  useEffect(() => {     // back/forward and desktop deep links (hash changes) navigate without a reload
+    const onHash = () => {
+      const r = parseHash(window.location.hash);
+      if (!r) return;
+      setSectionState(r.section); rememberPlace(r.section);
+      setFocusItem(r.section === "today" ? r.item ?? null : null);
+    };
+    window.addEventListener("hashchange", onHash); window.addEventListener("popstate", onHash);
+    return () => { window.removeEventListener("hashchange", onHash); window.removeEventListener("popstate", onHash); };
+  }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSkOpen(true); }
@@ -61,7 +84,7 @@ export function App({ client }: { client?: DataClient }) {
 
   function view() {
     switch (section) {
-      case "today": return <Today client={api} go={setSection} onCount={setTodayCount} focusItem={focusItem} onFocused={() => setFocusItem(null)} />;
+      case "today": return <Today client={api} go={setSection} onCount={setTodayCount} focusItem={focusItem} onFocused={() => { setFocusItem(null); if (parseHash(window.location.hash)?.item) window.history.replaceState(null, "", formatHash({ section: "today" })); }} />;
       case "overview":
         return overview
           ? <Overview data={overview} go={setSection} />
@@ -86,6 +109,7 @@ export function App({ client }: { client?: DataClient }) {
       <Rail section={section} onNavigate={setSection} badges={{ today: notif.state?.count ?? todayCount ?? 0 }} />
       <div className="main" id="main" tabIndex={-1}>
         <Topbar project={overview?.project ?? null} onAsk={(t) => askSidekick(t, true)} onOpen={() => setSkOpen(true)} />
+        <ConnectionBanner problem={notif.problem} onRetry={() => void notif.refresh()} />
         <SectionTabs section={section} onNavigate={setSection} />
         <ErrorBoundary resetKey={section}>{view()}</ErrorBoundary>
       </div>
