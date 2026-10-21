@@ -7,7 +7,7 @@ import type {
   ActivityEvent, AppCapability, AttentionItem, ConnectOutcome, ContextSource, DeploymentInspection,
   DiscoveryFinding, MissionSummary, MissionDetail, MissionTemplate, ProjectOverview, ProjectRef,
   RuntimeHealth, SidekickContext, SidekickReply, SocialMissionView, SourceProposal, TodayDetail, TodayFeed,
-  TodayItemOptions, WorkflowSummary,
+  TodayItemOptions, WorkflowSummary, CaptureItem,
 } from "./types";
 import * as mock from "./mock";
 import { MockToday, TodayApiError } from "./mockToday";
@@ -41,6 +41,11 @@ export interface DataClient {
   snoozeToday(projectId: string, itemId: string, seconds: number): Promise<TodayDetail>;
   dismissToday(projectId: string, itemId: string): Promise<TodayDetail>;
   simulateTodayOutcome(projectId: string, itemId: string): Promise<TodayDetail>;
+  // Quick Capture — a durable intake. Never sends or approves; routes to a reminder, a case, or Intake.
+  capture(projectId: string, content: string, source?: string): Promise<CaptureItem>;
+  listCaptures(projectId: string, status?: string): Promise<CaptureItem[]>;
+  resolveCapture(projectId: string, captureId: string, caseId: string): Promise<CaptureItem>;
+  archiveCapture(projectId: string, captureId: string): Promise<CaptureItem>;
 }
 
 export class MockDataClient implements DataClient {
@@ -83,6 +88,10 @@ export class MockDataClient implements DataClient {
   async snoozeToday(_p: string, id: string, seconds: number) { return this.today.snooze(id, seconds); }
   async dismissToday(_p: string, id: string) { return this.today.dismiss(id); }
   async simulateTodayOutcome(_p: string, id: string) { return this.today.simulateOutcome(id); }
+  async capture(_p: string, content: string, source = "manual") { return this.today.capture(content, source); }
+  async listCaptures(_p: string, status?: string) { return this.today.listCaptures(status); }
+  async resolveCapture(_p: string, id: string, caseId: string) { return this.today.resolveCapture(id, caseId); }
+  async archiveCapture(_p: string, id: string) { return this.today.archiveCapture(id); }
   async askSidekick(ctx: SidekickContext, text: string) { return scriptedReply(ctx, text); }
   async proposeSource(projectId: string, text: string) { return scriptedSourceProposal(projectId, text); }
   async confirmSources(_projectId: string, sources: SourceProposal["sources"]) {
@@ -220,6 +229,10 @@ export class HttpDataClient implements DataClient {
   snoozeToday(id: string, itemId: string, seconds: number) { return this.today<TodayDetail>("POST", `/api/projects/${id}/today/${encodeURIComponent(itemId)}/snooze`, { seconds }); }
   dismissToday(id: string, itemId: string) { return this.today<TodayDetail>("POST", `/api/projects/${id}/today/${encodeURIComponent(itemId)}/dismiss`, {}); }
   simulateTodayOutcome(id: string, itemId: string) { return this.today<TodayDetail>("POST", `/api/projects/${id}/today/${encodeURIComponent(itemId)}/simulate-outcome`, {}); }
+  capture(id: string, content: string, source = "manual") { return this.today<CaptureItem>("POST", `/api/projects/${id}/capture`, { content, source }); }
+  listCaptures(id: string, status?: string) { return this.today<CaptureItem[]>("GET", `/api/projects/${id}/capture${status ? `?status=${encodeURIComponent(status)}` : ""}`); }
+  resolveCapture(id: string, captureId: string, caseId: string) { return this.today<CaptureItem>("POST", `/api/projects/${id}/capture/${encodeURIComponent(captureId)}/resolve`, { case_id: caseId }); }
+  archiveCapture(id: string, captureId: string) { return this.today<CaptureItem>("POST", `/api/projects/${id}/capture/${encodeURIComponent(captureId)}/archive`, {}); }
   askSidekick(ctx: SidekickContext, text: string) { return this.post<SidekickReply>("/api/sidekick", { ctx, text }); }
   proposeSource(projectId: string, text: string) { return this.post<SourceProposal>("/api/sources/propose", { project_id: projectId, text }); }
   confirmSources(projectId: string, sources: SourceProposal["sources"], confirmedBy: string) {

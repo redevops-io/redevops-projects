@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pill } from "../components/Pill";
 import type { Section } from "../components/Rail";
 import { TodayApiError, type DataClient } from "../data/client";
-import type { Health, TodayDetail, TodayFeed, TodayItem, TodayLifecycle, TodayRecipient, TodayState } from "../data/types";
+import type { CaptureItem, Health, TodayDetail, TodayFeed, TodayItem, TodayLifecycle, TodayRecipient, TodayState } from "../data/types";
 
 // Today — the default landing (CONTROL_SURFACES_UX plan §3). One ranked queue of what needs a human, in
 // domain language, with the next safe action beside it. Every state, priority, approval and digest is rendered
@@ -61,6 +61,12 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
   const [note, setNote] = useState<{ tone: Health; text: string } | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [showDone, setShowDone] = useState(false);
+  // Quick Capture: one field. The system decides where it goes; capturing never sends or approves anything.
+  const [text, setText] = useState("");
+  const [capBusy, setCapBusy] = useState(false);
+  const [capNote, setCapNote] = useState<{ tone: Health; text: string; open?: string } | null>(null);
+  const [intake, setIntake] = useState<CaptureItem[]>([]);
+  const capRef = useRef<HTMLInputElement>(null);
   const live = useRef(true);
   useEffect(() => () => { live.current = false; }, []);
 
@@ -74,6 +80,46 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
     } catch (e) { if (live.current) setErr(String((e as Error).message ?? e)); return null; }
   }, [client, onCount]);
   useEffect(() => { void loadFeed(); }, [loadFeed]);
+  const loadIntake = useCallback(async () => {
+    try {
+      const l = await client.listCaptures(PROJECT);
+      // Intake holds only what has no home in Today yet: waiting on one answer, or an investigation candidate.
+      // A scheduled reminder and a note linked to a case already live in Today.
+      if (live.current) setIntake(l.filter((c) => c.status === "needs_clarification" || c.routing?.kind === "investigation_candidate"));
+    } catch { /* intake is optional; the queue still works */ }
+  }, [client]);
+  useEffect(() => { void loadIntake(); }, [loadIntake]);
+
+  async function submitCapture() {
+    const t = text.trim();
+    if (!t || capBusy) return;
+    setCapBusy(true); setCapNote(null);
+    try {
+      const c = await client.capture(PROJECT, t);
+      if (!live.current) return;
+      setText("");
+      const r = c.routing;
+      if (c.duplicate) setCapNote({ tone: "mut", text: "You already captured this — kept the original." });
+      else if (r?.kind === "case") setCapNote({ tone: "ok", text: `Linked to “${r.title}”. It needs your attention — review it on the right. Nothing has been sent.`, open: r.item_id });
+      else if (r?.kind === "reminder") setCapNote({ tone: "ok", text: `Reminder set for ${new Date((r.due ?? 0) * 1000).toUTCString().slice(0, 22)} UTC. It will appear here when it's due.`, open: r.in_today_now ? r.item_id : undefined });
+      else if (r?.kind === "investigation_candidate") setCapNote({ tone: "ok", text: "Saved as something to investigate. It stays in Intake until there's a next action." });
+      else setCapNote({ tone: "warn", text: c.question?.text ?? "Saved to Intake — I need one detail from you." });
+      await loadFeed(); await loadIntake();
+      if (r?.kind === "case" && r.item_id) setSel(r.item_id);                  // go straight to the thing to review
+    } catch (e) { if (live.current) setCapNote({ tone: "bad", text: (e as Error).message ?? String(e) }); }
+    finally { if (live.current) setCapBusy(false); }
+  }
+  async function resolveIntake(c: CaptureItem, caseId: string) {
+    try {
+      const r = await client.resolveCapture(PROJECT, c.id, caseId);
+      setCapNote({ tone: "ok", text: `Linked to “${r.routing?.title ?? "the case"}”. Nothing has been sent.` });
+      await loadFeed(); await loadIntake();
+      if (r.routing?.item_id) setSel(r.routing.item_id);
+    } catch (e) { setCapNote({ tone: "bad", text: (e as Error).message ?? String(e) }); }
+  }
+  async function archiveIntake(c: CaptureItem) {
+    try { await client.archiveCapture(PROJECT, c.id); await loadIntake(); } catch (e) { setCapNote({ tone: "bad", text: (e as Error).message ?? String(e) }); }
+  }
 
   const loadDetail = useCallback(async (id: string, t?: string[], ident?: string) => {
     try {
@@ -105,6 +151,7 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "c") { e.preventDefault(); capRef.current?.focus(); return; }
       const dir = e.key === "j" || e.key === "ArrowDown" ? 1 : e.key === "k" || e.key === "ArrowUp" ? -1 : 0;
       if (!dir || !flat.length) return;
       e.preventDefault();
@@ -171,6 +218,17 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
         <div className="eyebrow">Today</div>
         <h1 className="h" aria-live="polite">{feed.headline}</h1>
         {feed.basis === "sample" && <div className="banner">Sample data — actions here are simulated; nothing leaves this app.</div>}
+        <form className="capture" onSubmit={(e) => { e.preventDefault(); void submitCapture(); }}>
+          <label htmlFor="capture-input" className="sr">Quick capture</label>
+          <input id="capture-input" ref={capRef} value={text} maxLength={2000} disabled={capBusy} autoComplete="off"
+            placeholder="Capture anything — a reminder, a note about a customer, something to send…"
+            onChange={(e) => setText(e.target.value)} />
+          <button className="btn pri" type="submit" disabled={capBusy || !text.trim()}>{capBusy ? "Saving…" : "Capture"}</button>
+        </form>
+        {capNote && (
+          <div className={`banner ${capNote.tone}`} role="status">{capNote.text}
+            {capNote.open && <> <button className="btn sm" type="button" onClick={() => setSel(capNote.open!)}>Open</button></>}</div>
+        )}
       </div>
 
       <div className="split">
@@ -198,7 +256,27 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
             <div className="card"><div className="hd"><Pill tone="ok">Handled automatically</Pill><span className="eyebrow" style={{ marginLeft: "auto" }}>{feed.handled_automatically}</span></div>
               <div className="bd s">{feed.handled_automatically} routine item{feed.handled_automatically === 1 ? " was" : "s were"} handled within policy; {feed.abstained} judged too low-value to interrupt you.</div></div>
           )}
-          <div className="s hint">Tip: j / k to move through the queue.</div>
+          {intake.length > 0 && (
+            <div className="card" aria-label="Intake">
+              <div className="hd"><Pill tone="mut">Captured, not in Today</Pill><span className="eyebrow" style={{ marginLeft: "auto" }}>{intake.length}</span></div>
+              <div className="bd">
+                {intake.map((c) => (
+                  <div className="row intake" key={c.id}>
+                    <div className="grow">
+                      <div className="t">{c.content}</div>
+                      {c.status === "needs_clarification" && c.question && <div className="s">{c.question.text}</div>}
+                      {c.status === "classified" && <div className="s">{c.suggested_action?.label ?? "Saved."} Not in Today until there's a next action.</div>}
+                      {c.status === "needs_clarification" && c.question && c.question.options.length > 0 && (
+                        <div className="opts">{c.question.options.map((o) => <button key={o.case_id} className="btn sm" onClick={() => void resolveIntake(c, o.case_id)}>{o.label}</button>)}</div>
+                      )}
+                    </div>
+                    <button className="btn sm" onClick={() => void archiveIntake(c)} aria-label={`Archive: ${c.content}`}>Archive</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="s hint">Tips: j / k move through the queue · c captures.</div>
         </div>
 
         <aside className="detail card" aria-label="Item details">
@@ -251,6 +329,8 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
                     </>
                   ) : null}
                 </div>
+              ) : detail.kind === "reminder" ? (
+                <div className="sec"><div className="eyebrow">Suggested next step</div><p>Do it, then mark it done.</p></div>
               ) : (
                 <div className="sec"><div className="eyebrow">Suggested next step</div><p>{detail.next_action.plain_language_label}</p>
                   <div className="s">This comes from a cross-app signal; resolve it where it originates.</div></div>
@@ -272,7 +352,10 @@ export function Today({ client, go, onCount }: { client: DataClient; go: (s: Sec
                   </button>
                 )}
                 {detail.resurfaced && <span className="s">No response yet — it is back in your queue so it is not lost.</span>}
-                {!act && <button className="btn" onClick={() => go("attention")}>Open in Attention</button>}
+                {detail.kind === "reminder" && detail.state !== "dismissed" && (
+                  <button className="btn pri" disabled={busy} onClick={() => run(() => client.dismissToday(PROJECT, detail.id), () => "Marked done.")}>Mark done</button>
+                )}
+                {!act && detail.kind === "signal" && <button className="btn" onClick={() => go("attention")}>Open in Attention</button>}
                 {detail.state !== "verified" && detail.state !== "dismissed" && (
                   <label className="snooze s">Snooze
                     <select aria-label="Snooze" disabled={busy} value="" onChange={(e) => { const v = Number(e.target.value); if (v) void run(() => client.snoozeToday(PROJECT, detail.id, v), () => "Snoozed — it will come back."); }}>

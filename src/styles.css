@@ -189,3 +189,10 @@ ol.steps li{margin:4px 0}
 .skip{position:absolute;left:-9999px;top:8px;background:var(--panel);color:var(--ink);padding:8px 12px;border-radius:8px;z-index:30;border:2px solid var(--accent)}
 .skip:focus{left:8px}
 .due{white-space:nowrap}
+
+/* ---- Quick capture ---- */
+.capture{display:flex;gap:8px;margin-top:10px}
+.capture input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line-2);border-radius:10px;padding:9px 12px;color:var(--ink);font:inherit}
+.capture input::placeholder{color:var(--muted)}
+.capture input:focus-visible{border-color:var(--accent)}
+.intake .opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
