@@ -72,3 +72,20 @@ describe("App routing — one implementation for browser and desktop", () => {
     expect(await screen.findByText("5 things need your decision.")).toBeTruthy();
   });
 });
+
+describe("deep link vs default selection — the ordering race", () => {
+  it("a deep link still wins when the parent's prop clears BEFORE the child's selection lands (the flaky interleaving, forced)", async () => {
+    const { useState } = await import("react");
+    const { flushSync } = await import("react-dom");
+    const { Today } = await import("./views/Today");
+    const c = new MockDataClient();
+    // flushSync renders the parent's `focusItem = null` immediately, while Today's own setSel is still pending — exactly what
+    // happened intermittently under load. Before the fix the default selection ("Visa …") overwrote the requested item.
+    function Harness() {
+      const [f, setF] = useState<string | null>("case-quote");
+      return <Today client={c} go={() => {}} focusItem={f} onFocused={() => flushSync(() => setF(null))} />;
+    }
+    render(<Harness />);
+    expect(await screen.findByRole("heading", { level: 2, name: /Quote hasn't been answered/ }, { timeout: 5000 })).toBeTruthy();
+  });
+});

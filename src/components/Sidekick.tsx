@@ -44,14 +44,23 @@ export function Sidekick({ open, ctx, client, onClose, seed, go }:
     setMsgs((m) => [...m, { who: "sk", text: reply.text, actions: reply.actions }]);
   }
 
+  const drawer = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = drawer.current;
+    if (!el) return;
+    if (open) el.removeAttribute("inert"); else el.setAttribute("inert", "");
+  }, [open]);
+
   const objectLine = ctx.objectRef ? <> · Object <b>{ctx.objectRef}</b></> : null;
 
   return (
     <>
       <div className={`backdrop ${open ? "open" : ""}`} onClick={onClose} />
-      <aside className={`sk ${open ? "open" : ""}`} aria-label="Sidekick">
+      {/* closed = out of the focus order AND the accessibility tree (it is only slid off-screen, so without this a keyboard user
+          tabs into three invisible controls and a screen reader reads a panel nobody can see) */}
+      <aside ref={drawer} className={`sk ${open ? "open" : ""}`} aria-label="Sidekick" aria-hidden={open ? undefined : true}>
         <div className="hd">
-          <span className="logo">◆</span><b>Sidekick</b>
+          <span className="logo" aria-hidden="true">◆</span><b>Sidekick</b>
           <span className="pill mut" style={{ marginLeft: 6 }}><span className="dot" />Mission Supervisor</span>
           <button className="x" onClick={onClose} aria-label="Close">✕</button>
         </div>

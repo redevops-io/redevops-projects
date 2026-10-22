@@ -9,7 +9,7 @@ export function Topbar({ project, onAsk, onOpen }:
   { project: ProjectRef | null; onAsk: (text: string) => void; onOpen: () => void }) {
   const [q, setQ] = useState("");
   return (
-    <div className="topbar">
+    <header className="topbar">
       <div className="proj">{project ? project.name : "Loading…"} <span className="chev">▾</span></div>
       <form
         className="ask"
@@ -30,6 +30,6 @@ export function Topbar({ project, onAsk, onOpen }:
         <span className="k mono">⌘K</span>
       </form>
       <Pill tone={project?.health ?? "mut"}>{project?.health === "ok" ? "Healthy" : "…"}</Pill>
-    </div>
+    </header>
   );
 }
