@@ -153,3 +153,30 @@ describe("Today", () => {
     expect(await screen.findByText("5 things need your decision.")).toBeTruthy();
   });
 });
+
+// A live signal (e.g. "Reconnect WhatsApp") has no ledger in Today: it is resolved where it originates, and the
+// server refuses to snooze it ("no such work item"). The UI must not offer the control that can only fail.
+describe("Today — live signals", () => {
+  class WithSignal extends MockDataClient {
+    async getToday(p?: string) {
+      const feed = await super.getToday(p);
+      const sig = { ...feed.items[0], id: "sig-wa", kind: "signal" as const, user_title: "Reconnect WhatsApp", reason: "The connection expired.", state: "needs_action" as const };
+      return { ...feed, items: [sig, ...feed.items] };
+    }
+    async getTodayItem(p: string, id: string, o?: Parameters<MockDataClient["getTodayItem"]>[2]) {
+      if (id !== "sig-wa") return super.getTodayItem(p, id, o);
+      const feed = await this.getToday(p);
+      const d = await super.getTodayItem(p, feed.items[1].id, o);
+      return { ...d, ...feed.items[0], action: null, history: [] } as unknown as Awaited<ReturnType<MockDataClient["getTodayItem"]>>;
+    }
+  }
+
+  it("offers Snooze for a case but not for a live signal", async () => {
+    render(<Today client={new WithSignal()} go={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Reconnect WhatsApp/ }));
+    expect(await screen.findByRole("heading", { name: "Reconnect WhatsApp" })).toBeTruthy();
+    expect(screen.queryByLabelText("Snooze")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Visa documents missing/ }));
+    expect(await screen.findByLabelText("Snooze")).toBeTruthy();
+  });
+});
