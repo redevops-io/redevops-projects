@@ -482,8 +482,8 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
                   <button className="btn pri" disabled={busy} onClick={() => run(() => client.dismissToday(PROJECT, detail.id), () => "Marked done.")}>Mark done</button>
                 )}
                 {!act && detail.kind === "signal" && <button className="btn" onClick={() => go("attention")}>Open in Attention</button>}
-                {detail.state !== "verified" && detail.state !== "dismissed" && (
-                  <label className="snooze s">Snooze
+                {selectable(detail) && detail.state !== "verified" && detail.state !== "dismissed" && (
+                  <label className="snooze s">Snooze this item
                     <select aria-label="Snooze" disabled={busy} value="" onChange={(e) => { const v = Number(e.target.value); if (v) void run(() => client.snoozeToday(PROJECT, detail.id, v), () => "Snoozed — it will come back."); }}>
                       <option value="">…</option>{SNOOZES.map((s) => <option key={s.seconds} value={s.seconds}>{s.label}</option>)}
                     </select>
