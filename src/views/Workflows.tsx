@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import { Pill } from "../components/Pill";
-import type { WorkflowSummary, WorkflowState } from "../data/types";
+import type { WorkflowState } from "../data/types";
+import { useDataBasis } from "../hooks/basis";
+import { useLoad } from "../hooks/useLoad";
+import { Loading, LoadError } from "../components/LoadState";
 
 const STATE_PILL: Record<WorkflowState, { tone: "run" | "mut"; label: string }> = {
   active: { tone: "run", label: "Active" },
@@ -48,17 +51,13 @@ const SOURCE_PILLS: { name: string; tone: "ok" | "warn" }[] = [
 ];
 
 export function Workflows({ client }: { client: DataClient; go: (s: Section) => void }) {
-  const [workflows, setWorkflows] = useState<WorkflowSummary[] | null>(null);
+  const L = useLoad("workflows", () => client.getWorkflows("customer-ops"), [client]);
+  const workflows = L.data;
+  const sim = useDataBasis() !== "live";
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<(typeof DETAIL_TABS)[number]>("Overview");
 
-  useEffect(() => {
-    client.getWorkflows("customer-ops").then(setWorkflows);
-  }, [client]);
-
-  if (!workflows) {
-    return <section className="content"><div className="placeholder">Loading…</div></section>;
-  }
+  if (!workflows) return L.problem ? <LoadError problem={L.problem} onRetry={L.retry} what="Workflows" /> : <Loading />;
 
   const selected = selectedId ? workflows.find((w) => w.id === selectedId) ?? null : null;
 
@@ -214,7 +213,7 @@ export function Workflows({ client }: { client: DataClient; go: (s: Section) => 
                 </div>
                 <Pill tone={sp.tone}>{sp.label}</Pill>
                 <button className="btn sm pri" onClick={() => { setSelectedId(w.id); setTab("Overview"); }}>Open</button>
-                <button className="btn sm">{w.state === "paused" ? "Run now" : "Pause"}</button>
+                <button className="btn sm" disabled={sim} title={sim ? "Disabled in the demo: nothing is run or paused here" : undefined}>{w.state === "paused" ? "Run now" : "Pause"}</button>
               </div>
             );
           })}

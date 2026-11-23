@@ -16,6 +16,7 @@ import { MockToday, TodayApiError } from "./mockToday";
 export { TodayApiError };
 
 export interface DataClient {
+  readonly kind?: "mock" | "http";       // what is behind it, so the UI can label example data truthfully
   listProjects(): Promise<ProjectRef[]>;
   getOverview(projectId: string): Promise<ProjectOverview>;
   getMissions(projectId: string): Promise<MissionSummary[]>;
@@ -57,6 +58,7 @@ export interface DataClient {
 }
 
 export class MockDataClient implements DataClient {
+  readonly kind = "mock" as const;
   async listProjects() { return [mock.PROJECT]; }
   async getOverview() { return mock.OVERVIEW; }
   async getMissions() { return mock.MISSIONS; }
@@ -231,6 +233,7 @@ export function classifyConnectionError(e: unknown): ConnectionProblem {
 }
 
 export class HttpDataClient implements DataClient {
+  readonly kind = "http" as const;
   constructor(private base: string) {}
   private async get<T>(path: string): Promise<T> {
     const r = await request(this.base.replace(/\/$/, "") + path, { headers: { Accept: "application/json" } });

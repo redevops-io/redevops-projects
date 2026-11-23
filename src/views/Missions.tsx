@@ -3,6 +3,8 @@ import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import { Pill } from "../components/Pill";
 import type { EvidenceItem, MissionDetail, MissionState, MissionSummary } from "../data/types";
+import { useLoad } from "../hooks/useLoad";
+import { Loading, LoadError } from "../components/LoadState";
 
 function fmtTime(iso: string): string {
   const d = new Date(iso);
@@ -61,19 +63,18 @@ const SIDEKICK_PROMPTS = [
 ];
 
 export function Missions({ client, ask }: { client: DataClient; go: (s: Section) => void; ask?: (prompt: string) => void }) {
-  const [missions, setMissions] = useState<MissionSummary[] | null>(null);
+  const L = useLoad("missions", () => client.getMissions("customer-ops"), [client]);
+  const missions = L.data;
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [confirm, setConfirm] = useState<string | null>(null);
   const [detail, setDetail] = useState<MissionDetail | null>(null);
+  const [detailProblem, setDetailProblem] = useState<string | null>(null);
 
   useEffect(() => {
-    client.getMissions("customer-ops").then(setMissions);
-  }, [client]);
-
-  useEffect(() => {
-    if (selectedId) client.getMissionDetail("customer-ops", selectedId).then(setDetail);
+    setDetailProblem(null);
+    if (selectedId) client.getMissionDetail("customer-ops", selectedId).then(setDetail, () => setDetailProblem("The details of this mission didn't load. Select it again to retry."));
     else setDetail(null);
   }, [client, selectedId]);
 
@@ -90,11 +91,7 @@ export function Missions({ client, ask }: { client: DataClient; go: (s: Section)
     }));
   }
 
-  if (!missions) {
-    return (
-      <section className="content"><div className="placeholder">Loading…</div></section>
-    );
-  }
+  if (!missions) return L.problem ? <LoadError problem={L.problem} onRetry={L.retry} what="Missions" /> : <Loading />;
 
   const selected = selectedId ? missions.find((m) => m.id === selectedId) ?? null : null;
 
@@ -131,6 +128,8 @@ export function Missions({ client, ask }: { client: DataClient; go: (s: Section)
             </ul>
           </div>
         </div>
+
+        {detailProblem && <div className="banner bad" role="alert">{detailProblem}</div>}
 
         {detail && detail.steps.length ? (
           <div className="card">

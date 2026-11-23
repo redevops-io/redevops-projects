@@ -1,16 +1,16 @@
 import { useState } from "react";
 import { Pill } from "./Pill";
-import type { ProjectRef } from "../data/types";
+import type { Health, ProjectRef } from "../data/types";
 
 // The top bar is itself an input (doc §2): type an outcome here and submit — the side panel
 // opens onto Sidekick's answer, so the user never has to open the panel first to ask. An
 // empty submit (or ⌘K) just opens the panel.
-export function Topbar({ project, onAsk, onOpen }:
-  { project: ProjectRef | null; onAsk: (text: string) => void; onOpen: () => void }) {
+export function Topbar({ project, unavailable, health, onAsk, onOpen }:
+  { project: ProjectRef | null; unavailable?: boolean; health: { tone: Health; label: string; title?: string }; onAsk: (text: string) => void; onOpen: () => void }) {
   const [q, setQ] = useState("");
   return (
     <header className="topbar">
-      <div className="proj">{project ? project.name : "Loading…"} <span className="chev">▾</span></div>
+      <div className="proj">{project ? project.name : unavailable ? "Project unavailable" : "Loading…"} <span className="chev">▾</span></div>
       <form
         className="ask"
         onSubmit={(e) => {
@@ -29,7 +29,7 @@ export function Topbar({ project, onAsk, onOpen }:
         />
         <span className="k mono">⌘K</span>
       </form>
-      <Pill tone={project?.health ?? "mut"}>{project?.health === "ok" ? "Healthy" : "…"}</Pill>
+      <span title={health.title}><Pill tone={health.tone}><span role="status">{health.label}</span></Pill></span>
     </header>
   );
 }

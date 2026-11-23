@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
 import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
-import type { SocialMissionView, Health } from "../data/types";
+import type { Health } from "../data/types";
 import { Pill } from "../components/Pill";
+import { useLoad } from "../hooks/useLoad";
+import { Loading, LoadError } from "../components/LoadState";
 
 // The source status STRING comes straight from the projection; tone only colours it. Availability is
 // never re-derived client-side.
@@ -13,14 +14,9 @@ function sourceTone(status: string): Health {
 
 export function SocialIntel({ client, ask }:
   { client: DataClient; go: (s: Section) => void; ask?: (p: string) => void }) {
-  const [data, setData] = useState<SocialMissionView | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => {
-    client.getSocialIntelligence("customer-ops").then(setData).catch((e) => setErr(String(e)));
-  }, [client]);
-
-  if (err) return <section className="content"><div className="placeholder">Couldn't load — {err}</div></section>;
-  if (!data) return <section className="content"><div className="placeholder">Loading social intelligence…</div></section>;
+  const L = useLoad("social", () => client.getSocialIntelligence("customer-ops"), [client]);
+  const data = L.data;
+  if (!data) return L.problem ? <LoadError problem={L.problem} onRetry={L.retry} what="Social Intelligence" /> : <Loading what="Loading social intelligence…" />;
 
   const o = data.opportunities;
   // Rendered verbatim from the projection — complaint ≠ solution-seeking ≠ purchase-intent, and UNKNOWN
