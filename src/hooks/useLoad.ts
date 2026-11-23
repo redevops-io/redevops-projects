@@ -25,7 +25,12 @@ export function useLoad<T>(key: string, load: () => Promise<T>, deps: readonly u
     setProblem(null);
     loadRef.current().then(
       (d) => { if (live) { setData(d); report(key, null); } },
-      (e) => { if (live) { const p = classifyConnectionError(e); setProblem(p); report(key, p); } },
+      (e) => {
+        if (!live) return;
+        const p = classifyConnectionError(e); setProblem(p);
+        // "this deployment doesn't serve that screen" is not an outage: it must not turn the whole shell red
+        report(key, p.kind === "incompatible" || p.kind === "unsupported" ? null : p);
+      },
     );
     return () => { live = false; report(key, null); };
     // eslint-disable-next-line react-hooks/exhaustive-deps

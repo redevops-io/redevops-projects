@@ -151,14 +151,14 @@ export function App({ client }: { client?: DataClient }) {
     <ConnectionContext.Provider value={reporter}><DataBasisContext.Provider value={basis}>
     <div className="app">
       <a className="skip" href="#main">Skip to content</a>
-      <Rail section={section} onNavigate={setSection} badges={{ today: notif.state?.count ?? todayCount ?? 0 }} />
+      <Rail section={section} onNavigate={setSection} badges={{ today: failing ? 0 : notif.state?.count ?? todayCount ?? 0 }} />
       <div className="main">
         <Topbar project={overview?.project ?? null} unavailable={!!overviewProblem} health={health} onAsk={(t) => askSidekick(t, true)} onOpen={() => setSkOpen(true)} />
         <ConnectionBanner problem={notif.problem} onRetry={() => void notif.refresh()} />
         {section !== "today" && <DemoBanner />}
         <SectionTabs section={section} onNavigate={setSection} />
         {/* in the page flow, not floating over it: a notification can never cover the item being reviewed */}
-        <NotificationToasts pending={notif.problem ? [] : notif.state?.pending ?? []}
+        <NotificationToasts pending={failing ? [] : notif.state?.pending ?? []}
           onOpen={(n) => { setSection("today"); setFocusItem(n.id); void notif.ack([n.key]); }}
           onDismiss={(n) => void notif.ack([n.key])} onDismissAll={() => void notif.ack((notif.state?.pending ?? []).map((p) => p.key))} />
         <main id="main" tabIndex={-1} className="viewport"><ErrorBoundary resetKey={section}>{view()}</ErrorBoundary></main>

@@ -70,6 +70,24 @@ describe.each([["offline", down], ["HTTP 500", err500]])("the app shell when eve
   });
 });
 
+describe("what the shell does not vouch for while the runtime is failing", () => {
+  it("drops the stale count and the stale notifications; a screen the deployment doesn't serve does not turn the shell red", async () => {
+    const c = new MockDataClient();
+    render(<App client={c} />);
+    await screen.findByRole("status", { name: "New items that need you" });
+    vi.spyOn(c, "getActivity").mockRejectedValue(new TodayApiError(404, "error", "Projects API → 404"));
+    nav(/^Activity/);
+    await screen.findByText("Activity isn't available on this deployment");
+    expect(screen.getByText("Healthy (sample)")).toBeTruthy();                                   // not an outage
+    expect(screen.getByRole("status", { name: "New items that need you" })).toBeTruthy();
+    vi.spyOn(c, "getActivity").mockRejectedValue(down());
+    nav(/^Today/); nav(/^Activity/);
+    await screen.findByText("Can't reach runtime", { selector: "[role=status]" });
+    expect(screen.queryByRole("status", { name: "New items that need you" })).toBeNull();        // no stale "Needs you" toasts
+    expect(within(screen.getByRole("navigation", { name: "Primary" })).getByRole("button", { name: /^Today/ }).textContent).not.toMatch(/\d/);
+  });
+});
+
 describe("honest labelling and layout hooks", () => {
   it("the document title tracks the section, with the count only when it is known", async () => {
     render(<App client={new MockDataClient()} />);
