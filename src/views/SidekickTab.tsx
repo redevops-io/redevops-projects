@@ -4,6 +4,9 @@ import type { DataClient } from "../data/client";
 import type { MissionTemplate, SidekickContext, SourceProposal } from "../data/types";
 import { APP_ID } from "../data/mock";
 import { Pill } from "../components/Pill";
+import { useLoad } from "../hooks/useLoad";
+import { LoadError } from "../components/LoadState";
+import { DemoFlag } from "../components/DemoFlag";
 
 // The DEDICATED Sidekick tab (doc §2) — a full-page conversational surface, distinct from
 // the floating Sidekick panel. Chat carries the current context so "this" is never
@@ -101,17 +104,14 @@ function TemplateCard({ t, onConnect }: { t: MissionTemplate; onConnect: (label:
 
 export function SidekickTab({ client, go, ctx }: { client: DataClient; go: (s: Section) => void; ctx: SidekickContext }) {
   const [tab, setTab] = useState<Tab>("chat");
-  const [templates, setTemplates] = useState<MissionTemplate[] | null>(null);
+  const T = useLoad("templates", () => client.getTemplates(ctx.projectId), [client, ctx.projectId]);
+  const templates = T.data; const setTemplates = T.setData;
   const [msgs, setMsgs] = useState<Msg[]>([
     { who: "sk", text: "I carry your current context (shown above), so “this” always means what you're looking at. Describe an outcome — I connect the apps, verify them, and run the work under governance." },
   ]);
   const [input, setInput] = useState("");
   const [pendingSource, setPendingSource] = useState<SourceProposal | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    client.getTemplates(ctx.projectId).then(setTemplates);
-  }, [client, ctx.projectId]);
 
   useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight; }, [msgs]);
 
@@ -227,7 +227,7 @@ export function SidekickTab({ client, go, ctx }: { client: DataClient; go: (s: S
 
       {tab === "templates" ? (
         !templates
-          ? <div className="placeholder">Loading…</div>
+          ? (T.problem ? <LoadError problem={T.problem} onRetry={T.retry} what="templates" /> : <div className="placeholder" role="status">Loading…</div>)
           : <div>{templates.map((t) => <TemplateCard key={t.id} t={t} onConnect={connectDep} />)}</div>
       ) : null}
 
@@ -246,7 +246,7 @@ export function SidekickTab({ client, go, ctx }: { client: DataClient; go: (s: S
         </div>
       ) : null}
 
-      <div className="demoflag">Sidekick is the conversational control surface — LLM interprets · human confirms · Runtime compiles. Example replies via the mock Projects API client.</div>
+      <DemoFlag>Sidekick is the conversational control surface — LLM interprets · human confirms · Runtime compiles. Replies here are scripted examples</DemoFlag>
     </section>
   );
 }

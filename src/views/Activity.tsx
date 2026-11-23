@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
-import type { ActivityEvent, SourceRuntime } from "../data/types";
+import type { SourceRuntime } from "../data/types";
+import { useLoad } from "../hooks/useLoad";
+import { Loading, LoadError } from "../components/LoadState";
+import { DemoFlag } from "../components/DemoFlag";
 
 // The Activity view (P8) renders the event ledger projected across Runtimes. Each event
 // carries its source_runtime provenance, so the filter row is a lens onto one Runtime's
@@ -17,18 +20,11 @@ const FILTERS: { id: Filter; label: string }[] = [
 ];
 
 export function Activity({ client }: { client: DataClient; go: (s: Section) => void }) {
-  const [events, setEvents] = useState<ActivityEvent[] | null>(null);
+  const L = useLoad("activity", () => client.getActivity("customer-ops"), [client]);
+  const events = L.data;
   const [filter, setFilter] = useState<Filter>("all");
 
-  useEffect(() => {
-    client.getActivity("customer-ops").then(setEvents);
-  }, [client]);
-
-  if (!events) {
-    return (
-      <section className="content"><div className="placeholder">Loading…</div></section>
-    );
-  }
+  if (!events) return L.problem ? <LoadError problem={L.problem} onRetry={L.retry} what="Activity" /> : <Loading />;
 
   const shown = filter === "all" ? events : events.filter((e) => e.source_runtime === filter);
 
@@ -58,7 +54,7 @@ export function Activity({ client }: { client: DataClient; go: (s: Section) => v
         </div>
       </div>
 
-      <div className="demoflag">One immutable ledger; each filter is a lens onto a Runtime's contribution — example data via the mock Projects API client.</div>
+      <DemoFlag>One immutable ledger; each filter is a lens onto a Runtime's contribution</DemoFlag>
     </section>
   );
 }

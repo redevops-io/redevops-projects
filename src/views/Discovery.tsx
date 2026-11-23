@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import { Pill } from "../components/Pill";
-import type { DiscoveryFinding } from "../data/types";
+import { useLoad } from "../hooks/useLoad";
+import { Loading, LoadError } from "../components/LoadState";
 
 const TABS = ["Findings", "Evidence", "Sources", "Changes", "History"] as const;
 type Tab = (typeof TABS)[number];
@@ -17,18 +18,11 @@ const SOURCES: { label: string; tone: "ok" | "run" | "warn" | "mut" }[] = [
 ];
 
 export function Discovery({ client, go }: { client: DataClient; go: (s: Section) => void }) {
-  const [findings, setFindings] = useState<DiscoveryFinding[] | null>(null);
+  const L = useLoad("discovery", () => client.getDiscovery("customer-ops"), [client]);
+  const findings = L.data;
   const [tab, setTab] = useState<Tab>("Findings");
 
-  useEffect(() => {
-    client.getDiscovery("customer-ops").then(setFindings);
-  }, [client]);
-
-  if (!findings) {
-    return (
-      <section className="content"><div className="placeholder">Loading…</div></section>
-    );
-  }
+  if (!findings) return L.problem ? <LoadError problem={L.problem} onRetry={L.retry} what="Discovery" /> : <Loading />;
 
   return (
     <section className="content">

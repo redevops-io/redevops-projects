@@ -3,6 +3,7 @@ import type { DataClient } from "../data/client";
 import type { Section } from "../nav";
 import type { NotificationPrefs } from "../data/types";
 import { Pill } from "../components/Pill";
+import { DemoFlag } from "../components/DemoFlag";
 
 // Settings — project-level durable configuration. No Runtime projection to load; these are
 // the project's standing policy facts. Kept on the same ({ client, go }) prop signature as
@@ -120,7 +121,7 @@ export function Settings(props: { client: DataClient; go: (s: Section) => void; 
         </div>
       </div>
 
-      <div className="demoflag">Durable project configuration — example values in this standalone build.</div>
+      <DemoFlag>Durable project configuration</DemoFlag>
     </section>
   );
 }

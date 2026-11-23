@@ -24,7 +24,7 @@
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hanken Grotesk",system-ui,-apple-system,sans-serif;font-size:14.5px;line-height:1.5}
-.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace}
+.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;overflow-wrap:anywhere;min-width:0}
 button{font:inherit;cursor:pointer}
 h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
@@ -41,7 +41,8 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
 .nav[aria-current="true"]{background:rgba(255,255,255,.11);color:#fff}
 .nav .ic{width:18px;text-align:center;opacity:.9}
 .nav .badge{margin-left:auto;background:var(--warn);color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
-@media(max-width:820px){.brand span.txt,.nav span.lbl,.nav .badge,.rgrp{display:none}}
+/* narrow: icon-only rail. The text stays in the accessible name (visually hidden, not display:none) */
+@media(max-width:820px){.brand span.txt,.rgrp{display:none}.nav span.lbl,.nav .badge{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.nav{position:relative}}
 .rail .foot{margin-top:auto;font-size:11px;color:#8ea3a5;padding:8px}
 @media(max-width:820px){.rail .foot{display:none}}
 
@@ -116,7 +117,7 @@ aside.sk.open{transform:none}
 .tabsrow button:hover{color:var(--ink)}
 .tabsrow button[aria-selected="true"]{color:var(--accent-ink);border-bottom-color:var(--accent)}
 .colw{width:150px;color:var(--muted);font-size:13px}
-.kv{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;font-size:13px;margin:8px 0}
+.kv{display:grid;grid-template-columns:130px minmax(0,1fr);gap:6px 12px;font-size:13px;margin:8px 0}
 .kv .k{color:var(--muted);font-family:"JetBrains Mono",monospace;font-size:11.5px}
 .apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
 .appcard{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow);overflow:hidden}
@@ -216,14 +217,14 @@ ol.steps li{margin:4px 0}
 .trowwrap .trow{border-top:0;flex:1;min-width:0}
 .pick{width:18px;height:18px;flex:none;accent-color:var(--accent)}
 
-/* ---- in-app notification toasts ---- */
-.toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:25;max-width:min(380px,calc(100vw - 32px))}
-.toast{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line-2);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px}
-.toast .grow{flex:1;min-width:0} .toast .t{font-weight:600;font-size:13px} .toast .s{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
-@media(prefers-reduced-motion:no-preference){.toast{animation:toastin .18s ease-out}@keyframes toastin{from{transform:translateY(6px);opacity:0}to{transform:none;opacity:1}}}
+/* ---- in-app notification toasts ----
+   In the page flow (between the connection banner and the content), never floating over it: a fixed stack used to cover
+   the right-hand detail pane and swallow clicks on "Open in Attention" and "Technical details". */
+.toasts{display:flex;flex-direction:column;gap:6px;padding:8px 22px;background:var(--panel-2);border-bottom:1px solid var(--line)}
+.toast{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line-2);border-radius:10px;padding:6px 10px}
+.toast .grow{flex:1;min-width:0;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap} .toast .t{font-weight:600;font-size:13px} .toast .s{font-size:13px;color:var(--ink-2);overflow-wrap:anywhere}
 .toast.more{justify-content:space-between} .toast.more .s{color:var(--ink-2)}
-/* narrow: the icon rail is 58px wide — keep the toast stack clear of it so it never covers navigation */
-@media(max-width:820px){.toasts{left:70px;right:12px;bottom:12px;max-width:none}.toast{padding:8px 10px}}
+@media(max-width:820px){.toasts{padding:6px 14px}.toast{padding:6px 8px}}
 
 /* ---- connection banner ---- */
 .connbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 22px;font-size:13px;border-bottom:1px solid var(--line);background:var(--warn-wash);color:var(--warn)}
@@ -244,3 +245,8 @@ main.viewport{display:block;min-width:0;outline:none}
 .find{display:flex;align-items:center;gap:10px;margin-top:8px}
 .find input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line-2);border-radius:10px;padding:7px 12px;color:var(--ink);font:inherit;min-height:24px}
 .find input::placeholder{color:var(--muted)}
+
+/* ---- sample-data banner (shell) ---- */
+.demobar{padding:6px 22px;font-size:12.5px;background:var(--panel-2);border-bottom:1px solid var(--line);color:var(--ink-2)}
+.demobar strong{color:var(--ink)}
+@media(max-width:820px){.demobar{padding:6px 14px}}

@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
 import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
-import type { DeploymentInspection, DeploymentFinding, GovernedActionView, Health } from "../data/types";
+import type { DeploymentFinding, GovernedActionView, Health } from "../data/types";
 import { Pill } from "../components/Pill";
+import { useLoad } from "../hooks/useLoad";
+import { Loading, LoadError } from "../components/LoadState";
 
 // Presentation-only tone maps. The LABEL rendered is always the projection's own string — these only
 // pick a colour. The card never re-derives severity, approval, verification or provider state.
@@ -16,14 +17,9 @@ const SEV_ORDER = ["critical", "high", "medium", "low"];
 
 export function Inspection({ client, ask }:
   { client: DataClient; go: (s: Section) => void; ask?: (p: string) => void }) {
-  const [data, setData] = useState<DeploymentInspection | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => {
-    client.getDeploymentInspection("customer-ops").then(setData).catch((e) => setErr(String(e)));
-  }, [client]);
-
-  if (err) return <section className="content"><div className="placeholder">Couldn't load the inspection — {err}</div></section>;
-  if (!data) return <section className="content"><div className="placeholder">Inspecting live deployment…</div></section>;
+  const L = useLoad("inspection", () => client.getDeploymentInspection("customer-ops"), [client]);
+  const data = L.data;
+  if (!data) return L.problem ? <LoadError problem={L.problem} onRetry={L.retry} what="Deployment health" /> : <Loading what="Loading deployment health…" />;
 
   const groups = SEV_ORDER.filter((s) => data.findings_by_severity[s]?.length);
 

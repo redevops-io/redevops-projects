@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
 import { Pill } from "../components/Pill";
 import type { Section } from "../components/Rail";
 import type { DataClient } from "../data/client";
-import type { AttentionItem, AttentionKind, Health } from "../data/types";
+import type { AttentionKind, Health } from "../data/types";
+import { useLoad } from "../hooks/useLoad";
+import { Loading, LoadError } from "../components/LoadState";
 
 // P3 — one cross-Runtime "what needs me" queue. Every item is an AttentionItem projection
 // (source_ref · kind · consequence · actions), grouped by kind into cards. Projects renders
@@ -26,15 +27,10 @@ function destination(kind: AttentionKind): Section | null {
 }
 
 export function Attention({ client, go }: { client: DataClient; go: (s: Section) => void }) {
-  const [items, setItems] = useState<AttentionItem[] | null>(null);
+  const L = useLoad("attention", () => client.getAttention("customer-ops"), [client]);
+  const items = L.data;
 
-  useEffect(() => {
-    let live = true;
-    client.getAttention("customer-ops").then((a) => { if (live) setItems(a); });
-    return () => { live = false; };
-  }, [client]);
-
-  if (!items) return <section className="content">Loading…</section>;
+  if (!items) return L.problem ? <LoadError problem={L.problem} onRetry={L.retry} what="Attention" /> : <Loading />;
 
   return (
     <section className="content">

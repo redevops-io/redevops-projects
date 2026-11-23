@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import { Pill } from "../components/Pill";
 import type { ContextSource, Health, SourceHealthState, SourceProposal } from "../data/types";
+import { useLoad } from "../hooks/useLoad";
+import { Loading, LoadError } from "../components/LoadState";
+import { DemoFlag } from "../components/DemoFlag";
 
 type Tab = "connected" | "add" | "indexes" | "permissions" | "health";
 
@@ -273,16 +276,11 @@ function AddSource({ client, go, onConnected }: {
 }
 
 export function Sources({ client, go }: { client: DataClient; go: (s: Section) => void }) {
-  const [sources, setSources] = useState<ContextSource[] | null>(null);
+  const L = useLoad("sources", () => client.getSources("customer-ops"), [client]);
+  const sources = L.data; const setSources = L.setData;
   const [tab, setTab] = useState<Tab>("connected");
 
-  useEffect(() => {
-    client.getSources("customer-ops").then(setSources);
-  }, [client]);
-
-  if (!sources) {
-    return <section className="content"><div className="placeholder">Loading…</div></section>;
-  }
+  if (!sources) return L.problem ? <LoadError problem={L.problem} onRetry={L.retry} what="Sources" /> : <Loading />;
 
   return (
     <section className="content">
@@ -378,7 +376,7 @@ export function Sources({ client, go }: { client: DataClient; go: (s: Section) =
         </div>
       ) : null}
 
-      <div className="demoflag">Sources define what evidence is available — Context Runtime decides how to retrieve and represent it. Example data via the mock Projects API client.</div>
+      <DemoFlag>Sources define what evidence is available — Context Runtime decides how to retrieve and represent it</DemoFlag>
     </section>
   );
 }

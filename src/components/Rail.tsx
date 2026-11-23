@@ -7,10 +7,10 @@ export function Rail({ section, onNavigate, badges }: { section: Section; onNavi
   const here = destinationOf(section).id;
   const primary = DESTINATIONS.filter((d) => !d.secondary), secondary = DESTINATIONS.filter((d) => d.secondary);
   const btn = (d: (typeof DESTINATIONS)[number]) => (
-    <button key={d.id} className="nav" aria-label={badges?.[d.id] ? `${d.label}, ${badges[d.id]} need you` : d.label} title={d.label} aria-current={here === d.id ? "page" : undefined} onClick={() => onNavigate(d.sections[0])}>
+    <button key={d.id} className="nav" title={d.label} aria-current={here === d.id ? "page" : undefined} onClick={() => onNavigate(d.sections[0])}>
       <span className="ic" aria-hidden="true">{d.icon}</span>
       <span className="lbl">{d.label}</span>
-      {badges?.[d.id] ? <span className="badge" aria-hidden="true">{badges[d.id]}</span> : null}
+      {badges?.[d.id] ? <><span className="badge">{badges[d.id]}</span><span className="sr"> need you</span></> : null}
     </button>
   );
   return (

@@ -23,8 +23,12 @@ import { Sources } from "./views/Sources";
 import { Apps } from "./views/Apps";
 import { Activity } from "./views/Activity";
 import { Settings } from "./views/Settings";
-import { makeClient, type DataClient } from "./data/client";
-import type { ProjectOverview, SidekickContext } from "./data/types";
+import { makeClient, classifyConnectionError, type ConnectionProblem, type DataClient } from "./data/client";
+import { ConnectionContext } from "./hooks/connection";
+import { DataBasisContext, type DataBasis } from "./hooks/basis";
+import { DemoBanner } from "./components/DemoFlag";
+import { Loading, LoadError } from "./components/LoadState";
+import type { Health, ProjectOverview, SidekickContext } from "./data/types";
 
 const SECTION_LABEL: Record<Section, string> = {
   today: "Today", overview: "Overview", missions: "Missions", inspection: "Deployment Inspection",
@@ -32,6 +36,8 @@ const SECTION_LABEL: Record<Section, string> = {
   attention: "Attention", discovery: "Discovery", sources: "Sources", apps: "Apps",
   activity: "Activity", settings: "Settings",
 };
+
+const healthLabel = (h: Health) => ({ ok: "Healthy", warn: "Degraded", bad: "Unhealthy", run: "Running", mut: "Unknown" })[h];
 
 export function App({ client }: { client?: DataClient }) {
   const api = useMemo(() => client ?? makeClient(), [client]);
@@ -48,6 +54,17 @@ export function App({ client }: { client?: DataClient }) {
     rememberPlace(s);
   }, []);
   const [overview, setOverview] = useState<ProjectOverview | null>(null);
+  const [overviewProblem, setOverviewProblem] = useState<ConnectionProblem | null>(null);
+  const [overviewTick, setOverviewTick] = useState(0);
+  // Failed loads reported by the views, so the shell never says "Healthy" while a screen has nothing to show.
+  const [viewProblems, setViewProblems] = useState<Record<string, ConnectionProblem>>({});
+  const reporter = useMemo(() => ({
+    report: (key: string, p: ConnectionProblem | null) => setViewProblems((m) => {
+      if (!p) { if (!(key in m)) return m; const { [key]: _gone, ...rest } = m; return rest; }
+      return m[key] === p ? m : { ...m, [key]: p };
+    }),
+  }), []);
+  const [basis, setBasis] = useState<DataBasis>(api.kind === "mock" ? "mock" : "unknown");
   const [todayCount, setTodayCount] = useState<number | undefined>(undefined);
   const [focusItem, setFocusItem] = useState<string | null>(start.section === "today" ? start.item ?? null : null);
   const notif = useNotifications(api);
@@ -61,7 +78,21 @@ export function App({ client }: { client?: DataClient }) {
     setSkOpen(true);
   }
 
-  useEffect(() => { api.getOverview("customer-ops").then(setOverview).catch(() => { /* the connection banner explains it */ }); }, [api]);
+  useEffect(() => {
+    let live = true;
+    setOverviewProblem(null);
+    api.getOverview("customer-ops").then(
+      (o) => { if (live) setOverview(o); },
+      (e) => { if (live) setOverviewProblem(classifyConnectionError(e)); },
+    );
+    return () => { live = false; };
+  }, [api, overviewTick]);
+  useEffect(() => {      // what is behind the screen: the Today feed says whether it is sample data
+    if (api.kind === "mock") { setBasis("mock"); return; }
+    let live = true;
+    api.getToday("customer-ops").then((f) => { if (live) setBasis(f.basis === "sample" ? "sample" : f.basis === "unavailable" ? "unknown" : "live"); }, () => { /* stays "unknown" */ });
+    return () => { live = false; };
+  }, [api]);
   useEffect(() => {     // back/forward and desktop deep links (hash changes) navigate without a reload
     const onHash = () => {
       const r = parseHash(window.location.hash);
@@ -80,6 +111,19 @@ export function App({ client }: { client?: DataClient }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // One answer to "can we reach the runtime and did the data load?" — drives the badge and the window title.
+  const failing = notif.problem ?? overviewProblem ?? Object.values(viewProblems)[0] ?? null;
+  const health: { tone: Health; label: string; title?: string } =
+    failing ? (failing.kind === "unavailable"
+        ? { tone: "bad", label: "Can't reach runtime", title: failing.detail }
+        : { tone: "warn", label: "Data didn't load", title: failing.detail })
+    : overview ? { tone: overview.project.health, label: healthLabel(overview.project.health) + (basis === "live" ? "" : " (sample)"), title: basis === "live" ? undefined : "Health of the sample project, not of a real system" }
+    : { tone: "mut", label: "Connecting…" };
+  useEffect(() => {
+    const n = notif.state && !failing ? notif.state.count : 0;     // a count we can no longer vouch for is not shown
+    try { document.title = `${n > 0 ? `(${n}) ` : ""}${failing ? "Can't reach runtime · " : ""}${SECTION_LABEL[section]} · ReDevOps`; } catch { /* no document */ }
+  }, [notif.state, notif.problem, failing, section]);
+
   const ctx: SidekickContext = { projectId: "customer-ops", section: SECTION_LABEL[section] };
 
   function view() {
@@ -88,7 +132,7 @@ export function App({ client }: { client?: DataClient }) {
       case "overview":
         return overview
           ? <Overview data={overview} go={setSection} />
-          : <section className="content"><div className="placeholder">Loading…</div></section>;
+          : overviewProblem ? <LoadError problem={overviewProblem} onRetry={() => setOverviewTick((n) => n + 1)} what="Summary" /> : <Loading />;
       case "missions": return <Missions client={api} go={setSection} ask={(t) => askSidekick(t, false)} />;
       case "inspection": return <Inspection client={api} go={setSection} ask={(t) => askSidekick(t, false)} />;
       case "social": return <SocialIntel client={api} go={setSection} ask={(t) => askSidekick(t, false)} />;
@@ -104,20 +148,24 @@ export function App({ client }: { client?: DataClient }) {
   }
 
   return (
+    <ConnectionContext.Provider value={reporter}><DataBasisContext.Provider value={basis}>
     <div className="app">
       <a className="skip" href="#main">Skip to content</a>
-      <Rail section={section} onNavigate={setSection} badges={{ today: notif.state?.count ?? todayCount ?? 0 }} />
+      <Rail section={section} onNavigate={setSection} badges={{ today: failing ? 0 : notif.state?.count ?? todayCount ?? 0 }} />
       <div className="main">
-        <Topbar project={overview?.project ?? null} onAsk={(t) => askSidekick(t, true)} onOpen={() => setSkOpen(true)} />
+        <Topbar project={overview?.project ?? null} unavailable={!!overviewProblem} health={health} onAsk={(t) => askSidekick(t, true)} onOpen={() => setSkOpen(true)} />
         <ConnectionBanner problem={notif.problem} onRetry={() => void notif.refresh()} />
+        {section !== "today" && <DemoBanner />}
         <SectionTabs section={section} onNavigate={setSection} />
+        {/* in the page flow, not floating over it: a notification can never cover the item being reviewed */}
+        <NotificationToasts pending={failing ? [] : notif.state?.pending ?? []}
+          onOpen={(n) => { setSection("today"); setFocusItem(n.id); void notif.ack([n.key]); }}
+          onDismiss={(n) => void notif.ack([n.key])} onDismissAll={() => void notif.ack((notif.state?.pending ?? []).map((p) => p.key))} />
         <main id="main" tabIndex={-1} className="viewport"><ErrorBoundary resetKey={section}>{view()}</ErrorBoundary></main>
       </div>
-      <NotificationToasts pending={notif.state?.pending ?? []}
-        onOpen={(n) => { setSection("today"); setFocusItem(n.id); void notif.ack([n.key]); }}
-        onDismiss={(n) => void notif.ack([n.key])} onDismissAll={() => void notif.ack((notif.state?.pending ?? []).map((p) => p.key))} />
       <Sidekick open={skOpen} ctx={ctx} client={api} seed={skSeed} onClose={() => setSkOpen(false)}
         go={(s) => { setSection(s); setSkOpen(false); }} />
     </div>
+    </DataBasisContext.Provider></ConnectionContext.Provider>
   );
 }

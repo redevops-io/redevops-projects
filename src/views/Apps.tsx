@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import { Pill } from "../components/Pill";
 import type { AppCapability, Health, SetupState } from "../data/types";
+import { useDataBasis } from "../hooks/basis";
+import { useLoad } from "../hooks/useLoad";
+import { Loading, LoadError } from "../components/LoadState";
 
 type Tab = "connected" | "available" | "health" | "permissions";
 
@@ -122,17 +125,13 @@ function AppCard({ a, onConnect, onContext }: { a: AppCapability; onConnect: (pr
 }
 
 export function Apps({ client, go }: { client: DataClient; go: (s: Section) => void }) {
-  const [apps, setApps] = useState<AppCapability[] | null>(null);
+  const L = useLoad("apps", () => client.getApps("customer-ops"), [client]);
+  const apps = L.data; const setApps = L.setData;
   const [tab, setTab] = useState<Tab>("connected");
   const [demoStatus, setDemoStatus] = useState<string | null>(null);
+  const basis = useDataBasis(); const sim = basis !== "live";
 
-  useEffect(() => {
-    client.getApps("customer-ops").then(setApps);
-  }, [client]);
-
-  if (!apps) {
-    return <section className="content"><div className="placeholder">Loading…</div></section>;
-  }
+  if (!apps) return L.problem ? <LoadError problem={L.problem} onRetry={L.retry} what="Apps" /> : <Loading />;
 
   // Flip an app to a verified-read state locally, so the demo reflects the connect action
   // without a round trip.
@@ -161,7 +160,7 @@ export function Apps({ client, go }: { client: DataClient; go: (s: Section) => v
       <div className="card">
         <div className="hd">
           <span className="eyebrow">Killer demo</span>
-          <span style={{ marginLeft: "auto" }}><Pill tone="ok">Ready to test</Pill></span>
+          <span style={{ marginLeft: "auto" }}><Pill tone={sim ? "mut" : "ok"}>{sim ? "Simulated" : "Ready to test"}</Pill></span>
         </div>
         <div className="bd">
           <div className="flowline">
@@ -174,7 +173,7 @@ export function Apps({ client, go }: { client: DataClient; go: (s: Section) => v
             <span className="n">reply</span>
           </div>
           <div className="row">
-            <button className="btn pri" onClick={() => setDemoStatus("Running demo Mission…")}>Run demo Mission</button>
+            <button className="btn pri" onClick={() => setDemoStatus(sim ? "Nothing was started — this demo cannot run a Mission; it only shows the flow." : "Running demo Mission…")}>{sim ? "Show demo Mission (simulated)" : "Run demo Mission"}</button>
             {demoStatus ? <span className="s" style={{ marginLeft: 4 }}>{demoStatus}</span> : null}
           </div>
         </div>

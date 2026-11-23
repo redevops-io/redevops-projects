@@ -5,7 +5,7 @@ import { classifyConnectionError, type ConnectionProblem } from "../data/client"
 
 // Notifications are DERIVED from Today (same stable ids and state, no second workflow). The server decides what is
 // actionable, what is already acknowledged, and what quiet hours suppress; this hook only polls and relays.
-// A snoozed item is silent until it wakes. The window title uses the content-free summary only.
+// A snoozed item is silent until it wakes. (The window title, which uses the content-free count only, is set by App.)
 export function useNotifications(client: DataClient, projectId = "customer-ops", intervalMs = 30_000) {
   const [state, setState] = useState<TodayNotifications | null>(null);
   // null = reachable. Otherwise why not — shown as a slim banner while the last known state stays on screen.
@@ -25,6 +25,7 @@ export function useNotifications(client: DataClient, projectId = "customer-ops",
       // report it only after two in a row so one dropped request doesn't flash a banner.
       failures.current += 1;
       if (live.current && failures.current >= 2) setProblem(classifyConnectionError(e));
+      else if (live.current && failures.current === 1) setTimeout(() => { if (live.current) void refresh(); }, 4_000);   // confirm soon, not after the next 30s poll
       return null;
     }
   }, [client, projectId]);
@@ -36,12 +37,6 @@ export function useNotifications(client: DataClient, projectId = "customer-ops",
     const t = setInterval(() => { if (typeof document === "undefined" || document.visibilityState !== "hidden") void refresh(); }, problem?.retryable ? Math.min(intervalMs, 5_000) : intervalMs);
     return () => clearInterval(t);
   }, [refresh, intervalMs, problem?.retryable]);
-
-  useEffect(() => {
-    if (!state) return;
-    const base = "Today · ReDevOps";
-    try { document.title = state.count > 0 ? `(${state.count}) ${base}` : base; } catch { /* no document */ }
-  }, [state]);
 
   const ack = useCallback(async (keys: string[]) => {
     if (!keys.length) return;
