@@ -40,8 +40,16 @@ export function Sidekick({ open, ctx, client, onClose, seed, go }:
     if (!text.trim()) return;
     setMsgs((m) => [...m, { who: "you", text }]);
     setInput("");
-    const reply = await client.askSidekick(ctx, text);
-    setMsgs((m) => [...m, { who: "sk", text: reply.text, actions: reply.actions }]);
+    try {
+      const reply = await client.askSidekick(ctx, text);
+      setMsgs((m) => [...m, { who: "sk", text: reply.text, actions: reply.actions }]);
+    } catch (e) {
+      // a refused or failed request must be said, not swallowed: the person asked something and is waiting
+      const why = (e as { status?: number })?.status === 401 || (e as { status?: number })?.status === 403
+        ? "This deployment did not accept the request. Check your sign-in, then ask again."
+        : "I could not reach the runtime, so I have no answer. Your question was not lost; ask again in a moment.";
+      setMsgs((m) => [...m, { who: "sk", text: why }]);
+    }
   }
 
   const drawer = useRef<HTMLElement>(null);

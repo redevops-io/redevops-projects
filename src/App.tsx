@@ -12,6 +12,7 @@ import { Topbar } from "./components/Topbar";
 import { Sidekick, type SidekickSeed } from "./components/Sidekick";
 import { Today } from "./views/Today";
 import { Overview } from "./views/Overview";
+import { Dashboards } from "./views/Dashboards";
 import { Missions } from "./views/Missions";
 import { Inspection } from "./views/Inspection";
 import { SocialIntel } from "./views/SocialIntel";
@@ -27,7 +28,7 @@ import { makeClient, type DataClient } from "./data/client";
 import type { ProjectOverview, SidekickContext } from "./data/types";
 
 const SECTION_LABEL: Record<Section, string> = {
-  today: "Today", overview: "Overview", missions: "Missions", inspection: "Deployment Inspection",
+  today: "Today", dashboards: "Dashboards", overview: "Overview", missions: "Missions", inspection: "Deployment Inspection",
   social: "Social Intelligence", workflows: "Workflows", sidekick: "Sidekick",
   attention: "Attention", discovery: "Discovery", sources: "Sources", apps: "Apps",
   activity: "Activity", settings: "Settings",
@@ -50,13 +51,18 @@ export function App({ client }: { client?: DataClient }) {
   const [overview, setOverview] = useState<ProjectOverview | null>(null);
   const [todayCount, setTodayCount] = useState<number | undefined>(undefined);
   const [focusItem, setFocusItem] = useState<string | null>(start.section === "today" ? start.item ?? null : null);
+  // Dashboards: the open dashboard (deep-linkable as #/dashboards/<id>) and what Sidekick's "this" means while there.
+  const [dashItem, setDashItem] = useState<string | null>(start.section === "dashboards" ? start.item ?? null : null);
+  const [dashRef, setDashRef] = useState<string | undefined>(undefined);
+  const [dashProject, setDashProject] = useState("");
   const notif = useNotifications(api);
   const [skOpen, setSkOpen] = useState(false);
   const [skSeed, setSkSeed] = useState<SidekickSeed | null>(null);
 
   // Both entry points converge here. `send:false` (suggested prompts) pre-fills + focuses the
   // panel input; `send:true` (top-bar submit) opens straight onto the answer.
-  function askSidekick(text: string, send: boolean) {
+  function askSidekick(text: string, send: boolean, objectRef?: string) {
+    if (objectRef !== undefined) setDashRef(objectRef);
     setSkSeed({ text, send, nonce: Date.now() });
     setSkOpen(true);
   }
@@ -68,6 +74,7 @@ export function App({ client }: { client?: DataClient }) {
       if (!r) return;
       setSectionState(r.section); rememberPlace(r.section);
       setFocusItem(r.section === "today" ? r.item ?? null : null);
+      if (r.section === "dashboards") setDashItem(r.item ?? null);
     };
     window.addEventListener("hashchange", onHash); window.addEventListener("popstate", onHash);
     return () => { window.removeEventListener("hashchange", onHash); window.removeEventListener("popstate", onHash); };
@@ -80,11 +87,16 @@ export function App({ client }: { client?: DataClient }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const ctx: SidekickContext = { projectId: "customer-ops", section: SECTION_LABEL[section] };
+  const ctx: SidekickContext = section === "dashboards"
+    ? { projectId: dashProject || "customer-ops", section: SECTION_LABEL[section], objectRef: dashRef }
+    : { projectId: "customer-ops", section: SECTION_LABEL[section] };
 
   function view() {
     switch (section) {
       case "today": return <Today client={api} go={setSection} onCount={setTodayCount} focusItem={focusItem} onFocused={() => { setFocusItem(null); if (parseHash(window.location.hash)?.item) window.history.replaceState(null, "", formatHash({ section: "today" })); }} />;
+      case "dashboards":
+        return <Dashboards client={api} go={setSection} ask={askSidekick} initial={dashItem}
+          onContext={(ref, project) => { setDashRef(ref); setDashProject(project); }} />;
       case "overview":
         return overview
           ? <Overview data={overview} go={setSection} />
@@ -108,7 +120,8 @@ export function App({ client }: { client?: DataClient }) {
       <a className="skip" href="#main">Skip to content</a>
       <Rail section={section} onNavigate={setSection} badges={{ today: notif.state?.count ?? todayCount ?? 0 }} />
       <div className="main">
-        <Topbar project={overview?.project ?? null} onAsk={(t) => askSidekick(t, true)} onOpen={() => setSkOpen(true)} />
+        <Topbar project={overview?.project ?? null} onAsk={(t) => askSidekick(t, true)} onOpen={() => setSkOpen(true)}
+          onDashboards={() => setSection("dashboards")} onDashboardsNow={section === "dashboards"} />
         <ConnectionBanner problem={notif.problem} onRetry={() => void notif.refresh()} />
         <SectionTabs section={section} onNavigate={setSection} />
         <main id="main" tabIndex={-1} className="viewport"><ErrorBoundary resetKey={section}>{view()}</ErrorBoundary></main>
