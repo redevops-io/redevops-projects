@@ -341,6 +341,8 @@ export interface TodayFeed {
   items: TodayItem[];
   handled_automatically: number;
   abstained: number;
+  // What this deployment can do with Today. Absent on older servers: then every feature is assumed and a 501 answer switches it off.
+  supports?: { capture?: boolean; detail?: boolean };
 }
 
 export interface TodayRecipient { id: string; label: string; address: string }
