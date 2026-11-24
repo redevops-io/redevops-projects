@@ -112,14 +112,21 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
     if (focusItem && feed?.items.some((i) => i.id === focusItem)) { requested.current = focusItem; setSel(focusItem); onFocused?.(); }
     else if (focusItem && feed) { void loadFeed(); }
   }, [focusItem, feed, onFocused, loadFeed]);
+  // A deployment that only shows items from connected products has no capture and no item detail (the server answers 501). The feed says
+  // so (`supports`); for a server that does not, the first 501 is remembered. Either way the control is not shown and nothing is requested.
+  const [unsupported, setUnsupported] = useState<{ capture?: boolean; detail?: boolean }>({});
+  const canCapture = feed?.supports?.capture !== false && !unsupported.capture;
+  const canDetail = feed?.supports?.detail !== false && !unsupported.detail;
+  const is501 = (e: unknown) => (e as { status?: number } | null)?.status === 501;
   const loadIntake = useCallback(async () => {
+    if (!feed || !canCapture) return;
     try {
       const l = await client.listCaptures(PROJECT);
       // Intake holds only what has no home in Today yet: waiting on one answer, or an investigation candidate.
       // A scheduled reminder and a note linked to a case already live in Today.
       if (live.current) setIntake(l.filter((c) => c.status === "needs_clarification" || c.routing?.kind === "investigation_candidate"));
-    } catch { /* intake is optional; the queue still works */ }
-  }, [client]);
+    } catch (e) { if (is501(e) && live.current) setUnsupported((u) => ({ ...u, capture: true })); /* intake is optional; the queue still works */ }
+  }, [client, feed, canCapture]);
   useEffect(() => { void loadIntake(); }, [loadIntake]);
 
   const selectable = (it: TodayItem) => it.kind === "case" || it.kind === "reminder";
@@ -180,14 +187,19 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
   }
 
   const loadDetail = useCallback(async (id: string, t?: string[], ident?: string) => {
+    if (!canDetail) return;
     try {
       const d = await client.getTodayItem(PROJECT, id, { targets: t, identityId: ident });
       if (live.current) {
         setDetail(normalizeDetail(d));
         if (!t && !ident) setRoster(d.action ? { to: d.action.to, skipped: d.action.skipped } : null);
       }
-    } catch (e) { if (live.current) setNote({ tone: "bad", text: String((e as Error).message ?? e) }); }
-  }, [client]);
+    } catch (e) {
+      if (!live.current) return;
+      if (is501(e)) setUnsupported((u) => ({ ...u, detail: true }));
+      else setNote({ tone: "bad", text: String((e as Error).message ?? e) });
+    }
+  }, [client, canDetail]);
 
   // open the first item by default; reset the per-item choices when the selection changes
   useEffect(() => {
@@ -307,13 +319,13 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
         <div className="eyebrow">Today</div>
         <h1 className="h" aria-live="polite">{feed.headline}</h1>
         {feed.basis === "sample" && <div className="banner">Sample data — actions here are simulated; nothing leaves this app.</div>}
-        <form className="capture" onSubmit={(e) => { e.preventDefault(); void submitCapture(); }}>
+        {canCapture && <form className="capture" onSubmit={(e) => { e.preventDefault(); void submitCapture(); }}>
           <label htmlFor="capture-input" className="sr">Quick capture</label>
           <input id="capture-input" ref={capRef} value={text} maxLength={2000} disabled={capBusy} autoComplete="off"
             placeholder="Capture anything — a reminder, a note about a customer, something to send…"
             onChange={(e) => setText(e.target.value)} />
           <button className="btn pri" type="submit" disabled={capBusy || !text.trim()}>{capBusy ? "Saving…" : "Capture"}</button>
-        </form>
+        </form>}
         {allItems.length > 0 && (
           <div className="find">
             <label htmlFor="find-input" className="sr">Find a customer or item</label>
@@ -402,11 +414,21 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
               </div>
             </div>
           )}
-          <div className="s hint">Tips: j / k move through the queue · c captures · / finds · x selects.</div>
+          <div className="s hint">Tips: j / k move through the queue{canCapture ? " · c captures" : ""} · / finds · x selects.</div>
         </section>
 
         <aside className="detail card" aria-label="Item details">
-          {!detail && note ? (
+          {!canDetail ? (() => {
+            const it = feed.items.find((i) => i.id === sel);
+            return it ? (
+              <div className="bd">
+                <div className="hd"><h2 className="dt">{it.user_title}</h2></div>
+                <div className="sec"><div className="eyebrow">Why this matters</div><p>{it.reason}</p></div>
+                <div className="sec"><div className="eyebrow">Next step</div><p>{it.next_action.plain_language_label}</p></div>
+                <p className="s">This item comes from a connected product. Use the buttons on the item to act on it there.</p>
+              </div>
+            ) : <div className="bd placeholder" role="status">Select an item.</div>;
+          })() : !detail && note ? (
             <div className="bd"><div className={`banner ${note.tone}`} role="alert">{note.text}</div>
               <div className="actions"><button className="btn sm" onClick={() => { if (sel) { setNote(null); void loadDetail(sel); } }}>Try again</button></div></div>
           ) : !detail ? <div className="bd placeholder" role="status">{sel ? "Loading…" : "Select an item."}</div> : (
