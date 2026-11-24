@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bars, DataTable, Funnel, Matrix, SeriesTable, Stacked, StatTile, TimeSeries, fmt } from "../components/charts";
+import { Bars, DataTable, Funnel, Matrix, SeriesTable, Stacked, StatTile, TimeSeries, fmt, safeHref } from "../components/charts";
 import { Pill } from "../components/Pill";
 import type { Section } from "../components/Rail";
 import { classifyConnectionError, type DataClient } from "../data/client";
@@ -229,7 +229,7 @@ export function Dashboards({ client, go, ask, initial, onContext }: DashboardsPr
         <div className="dash-sources" role="group" aria-label="Data sources">
           {dash.sources.map((s) => <SourceChip key={s.id} s={s} now={dash.generated_at} />)}
           {sample && <span className="pill mut"><span className="dot" />Example data</span>}
-          {dash.advanced.map((a) => <a key={a.url} className="chiplink" href={a.url} target="_blank" rel="noreferrer noopener">{a.label} ↗</a>)}
+          {dash.advanced.filter((a) => safeHref(a.url)).map((a) => <a key={a.url} className="chiplink" href={a.url} target="_blank" rel="noreferrer noopener">{a.label} ↗</a>)}
         </div>
       )}
       {dash?.withheld.partial && <div className="dash-banner">{dash.withheld.detail}</div>}
@@ -375,7 +375,7 @@ function DrillDrawer({ client, dashboard, at, filters, onClose, go, ask }: {
                           {cols.map((c) => { const v = r.fields[c]; return <td key={c}>{v === null || v === undefined || v === "" ? "—" : typeof v === "number" ? fmt(v) : String(v)}</td>; })}
                           <td className="tnum">{when(r.at)}</td>
                           <td className="mono ref">{r.ref}</td>
-                          <td className="r">{r.url ? <a href={r.url} target="_blank" rel="noreferrer noopener" aria-label={`Open ${r.title || r.id} in its application`}>Open ↗</a> : null}</td>
+                          <td className="r">{safeHref(r.url) ? <a href={safeHref(r.url)} target="_blank" rel="noreferrer noopener" aria-label={`Open ${r.title || r.id} in its application`}>Open ↗</a> : null}</td>
                         </tr>
                       ))}
                     </tbody>

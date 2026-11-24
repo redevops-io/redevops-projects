@@ -8,6 +8,11 @@ import type { Health } from "../data/types";
 const TONE_VAR: Record<string, string> = { ok: "var(--ok)", warn: "var(--warn)", bad: "var(--bad)", run: "var(--run)", mut: "var(--line-2)" };
 const CURRENCY = /^[A-Z]{3}$/;
 
+// A link taken from another system's data is opened only if it is plain http(s); the runtime drops the rest too.
+export function safeHref(url: string | undefined | null): string | undefined {
+  return url && /^https?:\/\//i.test(url) ? url : undefined;
+}
+
 export function fmt(v: number | null | undefined, unit = ""): string {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
   const abs = Math.abs(v);
@@ -205,7 +210,7 @@ export function DataTable({ columns, rows, onDrill }: { columns: DashColumn[]; r
                   {j === 0 && r.drill && onDrill ? <button className="linkish" onClick={() => onDrill(r.drill!, String(r.cells[c.id] ?? ""))}>{cell(r.cells[c.id])}</button> : cell(r.cells[c.id])}
                 </td>
               ))}
-              <td className="r">{r.url ? <a href={r.url} target="_blank" rel="noreferrer noopener" aria-label={`Open ${String(r.cells[columns[0].id] ?? "record")} in its application`}>Open ↗</a> : null}</td>
+              <td className="r">{safeHref(r.url) ? <a href={safeHref(r.url)} target="_blank" rel="noreferrer noopener" aria-label={`Open ${String(r.cells[columns[0].id] ?? "record")} in its application`}>Open ↗</a> : null}</td>
             </tr>
           ))}
         </tbody>

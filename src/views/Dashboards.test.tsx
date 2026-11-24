@@ -167,3 +167,11 @@ describe("Sidekick", () => {
     expect(await screen.findByText(/did not accept the request/)).toBeTruthy();
   });
 });
+
+describe("links from application data", () => {
+  it("are opened only when they are plain http(s)", async () => {
+    const { safeHref } = await import("../components/charts");
+    expect(safeHref("https://crm.example/x")).toBe("https://crm.example/x");
+    for (const bad of ["javascript:alert(1)", "data:text/html,x", "/relative", "", undefined]) expect(safeHref(bad)).toBeUndefined();
+  });
+});
