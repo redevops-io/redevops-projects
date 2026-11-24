@@ -5,8 +5,8 @@ import type { ProjectRef } from "../data/types";
 // The top bar is itself an input (doc §2): type an outcome here and submit — the side panel
 // opens onto Sidekick's answer, so the user never has to open the panel first to ask. An
 // empty submit (or ⌘K) just opens the panel.
-export function Topbar({ project, onAsk, onOpen }:
-  { project: ProjectRef | null; onAsk: (text: string) => void; onOpen: () => void }) {
+export function Topbar({ project, onAsk, onOpen, onDashboards, onDashboardsNow }:
+  { project: ProjectRef | null; onAsk: (text: string) => void; onOpen: () => void; onDashboards?: () => void; onDashboardsNow?: boolean }) {
   const [q, setQ] = useState("");
   return (
     <header className="topbar">
@@ -29,6 +29,8 @@ export function Topbar({ project, onAsk, onOpen }:
         />
         <span className="k mono">⌘K</span>
       </form>
+      {/* Dashboards are reachable from every screen: people starting on Today could not tell they live under Work (UI Test Agent, 5 of 5 personas). */}
+      {onDashboards && <button type="button" className="btn sm topdash" aria-current={onDashboardsNow ? "page" : undefined} onClick={onDashboards}>Dashboards</button>}
       <Pill tone={project?.health ?? "mut"}>{project?.health === "ok" ? "Healthy" : "…"}</Pill>
     </header>
   );
