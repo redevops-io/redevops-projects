@@ -74,7 +74,7 @@ export function PortableApp() {
       <Dashboards key={epoch} client={client.asDataClient()}
         go={(section) => { if (section !== "dashboards") setNotice(transport.kind === "remote" ? `Open the Projects UI of ${transport.label} for that: this page shows the dashboards only.` : "That part of Projects needs a deployment: this page shows the dashboards only."); }}
         ask={() => setNotice(transport.kind === "remote" ? `Sidekick is in the Projects UI of ${transport.label}, not on this page.` : "Sidekick needs a Projects deployment; it is not part of this page.")} />
-      {transport.kind === "standalone" && <Unavailable client={client} epoch={epoch} />}
+      {transport.kind === "standalone" && <AboutThisBrowser client={client} epoch={epoch} />}
     </div>
   );
 }
@@ -160,17 +160,16 @@ function AddResults({ client, onAdded }: { client: PortableClient; onAdded: (tex
   );
 }
 
-function Unavailable({ client, epoch }: { client: PortableClient; epoch: number }) {
+// The dashboards view lists what is not available, with why and what to do (in this page's own words, from the kernel). What
+// only the page knows is said here once: why no credential is asked for, and whether this browser keeps what was added.
+function AboutThisBrowser({ client, epoch }: { client: PortableClient; epoch: number }) {
   const [info, setInfo] = useState<PortableInfo | null>(null);
   useEffect(() => { let on = true; client.about().then((i) => { if (on) setInfo(i); }).catch(() => undefined); return () => { on = false; }; }, [client, epoch]);
   if (!info) return null;
   return (
-    <section className="card pt-un" aria-labelledby="pt-un-h">
-      <div className="hd"><h2 id="pt-un-h" style={{ fontSize: 15 }}>Not available in this browser</h2></div>
-      <div className="bd" style={{ paddingTop: 12 }}>
-        <p className="pt-note" style={{ marginBottom: 10 }}>These {info.unavailable.length} dashboards read your applications. Connect to a Projects deployment that holds those connections to see them; no application credential is ever placed in this page.{info.durable ? "" : " This browser does not allow this page to keep data, so added results are lost when the tab closes."}</p>
-        <ul>{info.unavailable.map((u) => <li key={u.id}><b>{u.title}</b> needs {u.needs.join(", ")}</li>)}</ul>
-      </div>
-    </section>
+    <p className="pt-note pt-about">
+      The dashboards of your applications are never read from this page with an application's own credential. Connect to a Projects deployment that holds those connections to see them.
+      {info.durable ? " Results you add stay in this browser." : " This browser does not allow this page to keep data, so added results are lost when the tab closes."}
+    </p>
   );
 }
