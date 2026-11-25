@@ -112,3 +112,25 @@ describe("the first paint does not wait for the deployment answer when it does n
     window.location.hash = "";
   });
 });
+
+describe("the dashboards' first number is not behind a chain of requests", () => {
+  it("a deep link asks for the dashboard next to the catalogue, once each, and for no other project", async () => {
+    window.location.hash = "#/dashboards/portfolio";
+    const calls: string[] = [];
+    let releaseCatalog: () => void = () => {};
+    class Spy extends MockDataClient {
+      async listProjects() { return [{ id: "main", name: "Operations", health: "ok" as const, sample: false }]; }
+      async getDashboardCatalog() { calls.push("catalog"); await new Promise<void>((r) => { releaseCatalog = r; }); return super.getDashboardCatalog(); }
+      async getDashboard(...a: Parameters<MockDataClient["getDashboard"]>) { calls.push("dashboard:" + a[0]); return super.getDashboard(...a); }
+      async getNotifications(p: string) { calls.push("notifications:" + p); return super.getNotifications(p); }
+    }
+    render(<App client={new Spy()} />);
+    await waitFor(() => expect(calls).toContain("dashboard:portfolio"));       // asked while the catalogue is still on its way
+    expect(calls.filter((c) => c === "catalog")).toHaveLength(1);
+    await act(async () => { releaseCatalog(); });
+    await waitFor(() => expect(calls.some((c) => c.startsWith("notifications:"))).toBe(true));
+    expect(calls.filter((c) => c === "catalog")).toHaveLength(1);              // not remounted, not asked twice
+    expect(calls.filter((c) => c.startsWith("notifications:")).every((c) => c === "notifications:main")).toBe(true);
+    window.location.hash = "";
+  });
+});

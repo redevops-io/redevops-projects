@@ -47,7 +47,12 @@ export interface DashboardsProps {
 export function Dashboards({ client, go, ask, initial, onContext }: DashboardsProps) {
   const [catalog, setCatalog] = useState<DashCatalog | null>(null);
   const [problem, setProblem] = useState<string>("");
-  const [id, setId] = useState<string>("");
+  // A deep link (or the dashboard used last) is asked for AT ONCE, next to the catalogue, not after it: the first number on the
+  // page used to wait for two requests in a row. If the catalogue then says it is not offered here, the selection moves on.
+  const [id, setId] = useState<string>(() => {
+    if (initial) return initial;
+    try { return localStorage.getItem(LS_LAST) || ""; } catch { return ""; }
+  });
   const [filters, setFilters] = useState<DashFilters>({ days: 30 });
   const [dash, setDash] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(false);

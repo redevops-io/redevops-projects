@@ -56,7 +56,6 @@ export function App({ client }: { client?: DataClient }) {
   const [dashItem, setDashItem] = useState<string | null>(start.section === "dashboards" ? start.item ?? null : null);
   const [dashRef, setDashRef] = useState<string | undefined>(undefined);
   const [dashProject, setDashProject] = useState("");
-  const notif = useNotifications(api);
   const [skOpen, setSkOpen] = useState(false);
   const [skSeed, setSkSeed] = useState<SidekickSeed | null>(null);
 
@@ -74,6 +73,7 @@ export function App({ client }: { client?: DataClient }) {
   // except on the Dashboards, which need neither the project id nor the demo flag to draw.
   const [ready, setReady] = useState(() => recallDeployment());
   const [depRev, setDepRev] = useState(0);
+  const notif = useNotifications(api, deployment.projectId, 30_000, ready);
   useEffect(() => {
     let live = true;
     api.listProjects().then((ps) => {
@@ -143,7 +143,7 @@ export function App({ client }: { client?: DataClient }) {
           onDashboards={() => setSection("dashboards")} onDashboardsNow={section === "dashboards"} />
         <ConnectionBanner problem={notif.problem} onRetry={() => void notif.refresh()} />
         <SectionTabs section={section} onNavigate={setSection} />
-        <main id="main" tabIndex={-1} className="viewport"><ErrorBoundary resetKey={`${section}:${depRev}`} key={depRev}>{ready || section === "dashboards" ? view() : <section className="content"><div className="placeholder" role="status" data-testid="deployment-wait">Loading…</div></section>}</ErrorBoundary></main>
+        <main id="main" tabIndex={-1} className="viewport"><ErrorBoundary resetKey={`${section}:${section === "dashboards" ? 0 : depRev}`} key={section === "dashboards" ? "dashboards" : depRev}>{ready || section === "dashboards" ? view() : <section className="content"><div className="placeholder" role="status" data-testid="deployment-wait">Loading…</div></section>}</ErrorBoundary></main>
       </div>
       <NotificationToasts pending={notif.state?.pending ?? []}
         onOpen={(n) => { setSection("today"); setFocusItem(n.id); void notif.ack([n.key]); }}
