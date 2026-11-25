@@ -175,3 +175,15 @@ describe("links from application data", () => {
     for (const bad of ["javascript:alert(1)", "data:text/html,x", "/relative", "", undefined]) expect(safeHref(bad)).toBeUndefined();
   });
 });
+
+describe("a table is where a number is checked", () => {
+  it("shows the exact value where a tile would abbreviate it", async () => {
+    const { exact, fmt, SeriesTable } = await import("../components/charts");
+    expect(fmt(31287)).toBe("31.3k");
+    expect(exact(31287)).toBe("31,287");
+    expect(exact(1234567.891)).toBe("1,234,567.89");
+    expect(exact(null)).toBe("—");
+    const { container } = render(<SeriesTable x={["2026-11-25"]} series={[{ id: "passed", label: "Passed", tone: "ok", values: [31287] } as any]} />);
+    expect(container.querySelector("td.r")?.textContent).toBe("31,287");
+  });
+});
