@@ -3,6 +3,7 @@ import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import { Pill } from "../components/Pill";
 import type { WorkflowSummary, WorkflowState } from "../data/types";
+import { deployment } from "../data/deployment";
 
 const STATE_PILL: Record<WorkflowState, { tone: "run" | "mut"; label: string }> = {
   active: { tone: "run", label: "Active" },
@@ -53,7 +54,7 @@ export function Workflows({ client }: { client: DataClient; go: (s: Section) => 
   const [tab, setTab] = useState<(typeof DETAIL_TABS)[number]>("Overview");
 
   useEffect(() => {
-    client.getWorkflows("customer-ops").then(setWorkflows);
+    client.getWorkflows(deployment.projectId).then(setWorkflows);
   }, [client]);
 
   if (!workflows) {
@@ -127,9 +128,9 @@ export function Workflows({ client }: { client: DataClient; go: (s: Section) => 
             <div className="hd"><span className="eyebrow">Apps this workflow recruits</span></div>
             <div className="bd">
               <div className="row" style={{ flexWrap: "wrap" }}>
-                {APP_PILLS.map((a) => <Pill key={a.name} tone={a.tone}>{a.name}</Pill>)}
+                {deployment.sample ? APP_PILLS.map((a) => <Pill key={a.name} tone={a.tone}>{a.name}</Pill>) : null}
               </div>
-              <div className="s" style={{ marginTop: 8 }}>Illustrative — the planner recruits providers by capability.</div>
+              <div className="s" style={{ marginTop: 8 }}>{deployment.sample ? "Illustrative — the planner recruits providers by capability." : "The planner recruits providers by capability when the workflow runs; none is recorded for it yet."}</div>
             </div>
           </div>
         )}
@@ -139,7 +140,7 @@ export function Workflows({ client }: { client: DataClient; go: (s: Section) => 
             <div className="hd"><span className="eyebrow">Evidence this workflow reads</span></div>
             <div className="bd">
               <div className="row" style={{ flexWrap: "wrap" }}>
-                {SOURCE_PILLS.map((s) => <Pill key={s.name} tone={s.tone}>{s.name}</Pill>)}
+                {deployment.sample ? SOURCE_PILLS.map((s) => <Pill key={s.name} tone={s.tone}>{s.name}</Pill>) : null}
               </div>
               <div className="s" style={{ marginTop: 8 }}>
                 Apps are the actions this pattern can take; sources are the evidence it may read. Both are governed separately.
@@ -175,7 +176,8 @@ export function Workflows({ client }: { client: DataClient; go: (s: Section) => 
           <div className="card">
             <div className="hd"><span className="eyebrow">Recent runs</span></div>
             <div className="bd">
-              {RECENT_RUNS.map((r) => (
+              {!deployment.sample ? <div className="s">No run is recorded for this workflow yet.</div> : null}
+              {(deployment.sample ? RECENT_RUNS : []).map((r) => (
                 <div className="row" key={r.id}>
                   <div className="grow"><div className="t">{r.id}</div><div className="s">{r.note}</div></div>
                   <Pill tone={r.tone}>{r.label}</Pill>

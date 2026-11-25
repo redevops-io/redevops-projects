@@ -3,6 +3,7 @@ import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import { Pill } from "../components/Pill";
 import type { EvidenceItem, MissionDetail, MissionState, MissionSummary } from "../data/types";
+import { deployment } from "../data/deployment";
 
 function fmtTime(iso: string): string {
   const d = new Date(iso);
@@ -34,6 +35,7 @@ interface Step { label: string; mark: "done" | "now" | "todo"; pill?: string; }
 
 // Illustrative traces per mission. #4821 gets the full refund trace; others a generic done trace.
 function traceFor(m: MissionSummary): Step[] {
+  if (!deployment.sample) return [];      // a real mission's steps come from its own record, never from an example trace
   if (m.id === "4821") {
     return [
       { label: "WhatsApp message received", mark: "done" },
@@ -69,11 +71,11 @@ export function Missions({ client, ask }: { client: DataClient; go: (s: Section)
   const [detail, setDetail] = useState<MissionDetail | null>(null);
 
   useEffect(() => {
-    client.getMissions("customer-ops").then(setMissions);
+    client.getMissions(deployment.projectId).then(setMissions);
   }, [client]);
 
   useEffect(() => {
-    if (selectedId) client.getMissionDetail("customer-ops", selectedId).then(setDetail);
+    if (selectedId) client.getMissionDetail(deployment.projectId, selectedId).then(setDetail);
     else setDetail(null);
   }, [client, selectedId]);
 
@@ -190,9 +192,10 @@ export function Missions({ client, ask }: { client: DataClient; go: (s: Section)
         <div className="card">
           <div className="hd"><span className="eyebrow">Actions</span></div>
           <div className="bd">
+            {!deployment.sample ? <div className="s" style={{ marginBottom: 8 }}>A decision on this mission is made where it is governed (Today, or the system that runs it), not from this screen.</div> : null}
             <div className="row">
-              <button className="btn pri sm" onClick={() => setConfirm("Approved — the refund will execute under a GovernedEnvelope.")}>Approve</button>
-              <button className="btn sm" onClick={() => setConfirm("Rejected — no money moves; the customer is notified.")}>Reject</button>
+              {deployment.sample ? <button className="btn pri sm" onClick={() => setConfirm("Approved — the refund will execute under a GovernedEnvelope.")}>Approve</button> : null}
+              {deployment.sample ? <button className="btn sm" onClick={() => setConfirm("Rejected — no money moves; the customer is notified.")}>Reject</button> : null}
               <button className="btn sm"
                 onClick={() => ask ? ask("why does this need approval?") : setConfirm("Ask Sidekick: why does this need approval?")}>
                 Ask Sidekick

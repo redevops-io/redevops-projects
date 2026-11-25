@@ -4,6 +4,7 @@ import type { DataClient } from "../data/client";
 import type { MissionTemplate, SidekickContext, SourceProposal } from "../data/types";
 import { APP_ID } from "../data/mock";
 import { Pill } from "../components/Pill";
+import { deployment } from "../data/deployment";
 
 // The DEDICATED Sidekick tab (doc §2) — a full-page conversational surface, distinct from
 // the floating Sidekick panel. Chat carries the current context so "this" is never
@@ -179,7 +180,7 @@ export function SidekickTab({ client, go, ctx }: { client: DataClient; go: (s: S
       </div>
 
       <div className="ctxchip" style={{ border: "1px solid var(--line)", borderRadius: 8 }}>
-        Project: <b>Customer Operations</b> · Section: <b>{ctx.section}</b>{objectLine}
+        Project: <b>{deployment.projectName}</b> · Section: <b>{ctx.section}</b>{objectLine}
       </div>
 
       <div className="tabsrow" role="tablist">
@@ -235,7 +236,8 @@ export function SidekickTab({ client, go, ctx }: { client: DataClient; go: (s: S
         <div className="card">
           <div className="hd"><span className="eyebrow">Recent interactions</span></div>
           <div className="bd">
-            {RECENT.map((r) => (
+            {!deployment.sample ? <div className="s">Nothing has been asked here yet.</div> : null}
+            {(deployment.sample ? RECENT : []).map((r) => (
               <div className="row" key={r} style={{ cursor: "pointer" }}
                 onClick={() => { setInput(r); setTab("chat"); }}>
                 <div className="grow"><div className="t">{r}</div></div>

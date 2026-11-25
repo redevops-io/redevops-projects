@@ -3,6 +3,7 @@ import type { DataClient } from "../data/client";
 import type { Section } from "../nav";
 import type { NotificationPrefs } from "../data/types";
 import { Pill } from "../components/Pill";
+import { deployment } from "../data/deployment";
 
 // Settings — project-level durable configuration. No Runtime projection to load; these are
 // the project's standing policy facts. Kept on the same ({ client, go }) prop signature as
@@ -19,11 +20,11 @@ const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 function NotificationSettings({ client, onChanged }: { client: DataClient; onChanged?: () => void }) {
   const [prefs, setPrefs] = useState<NotificationPrefs | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { client.getNotifications("customer-ops").then((n) => setPrefs(n.prefs)).catch((e) => setErr(String(e.message ?? e))); }, [client]);
+  useEffect(() => { client.getNotifications(deployment.projectId).then((n) => setPrefs(n.prefs)).catch((e) => setErr(String(e.message ?? e))); }, [client]);
   async function save(p: Partial<NotificationPrefs> & { clear_quiet?: boolean }) {
     try {
       // tz is the browser's offset EAST of UTC, so quiet hours are in the user's own clock time
-      setPrefs(await client.setNotificationPrefs("customer-ops", { tz_offset_minutes: -new Date().getTimezoneOffset(), ...p }));
+      setPrefs(await client.setNotificationPrefs(deployment.projectId, { tz_offset_minutes: -new Date().getTimezoneOffset(), ...p }));
       setErr(null); onChanged?.();
     } catch (e) { setErr((e as Error).message ?? String(e)); }
   }
@@ -74,37 +75,41 @@ export function Settings(props: { client: DataClient; go: (s: Section) => void; 
             <>
               <div className="row">
                 <div className="grow"><div className="t">Project</div></div>
-                <div className="s">Customer Operations</div>
+                <div className="s">{deployment.projectName}</div>
               </div>
+              {deployment.sample ? (
               <div className="row">
                 <div className="grow"><div className="t">Approval policy</div>
                   <div className="s">Refunds require approval · outreach bounded</div></div>
                 <Pill tone="ok">Active</Pill>
               </div>
+              ) : null}
             </>
           )}
 
           {tab === "Notifications" && <NotificationSettings client={props.client} onChanged={props.onPrefsChanged} />}
 
-          {tab === "Members" && (
+          {!deployment.sample && ["Members", "Authority", "Models", "Security", "Retention"].includes(tab) && (<div className="row"><div className="grow s">Managed by the operator of this deployment. Nothing is shown here that the server did not report.</div></div>)}
+
+          {deployment.sample && tab === "Members" && (
             <div className="row">
               <div className="grow">2 admins · 1 operator — maker ≠ checker on consequential actions</div>
             </div>
           )}
 
-          {tab === "Authority" && (
+          {deployment.sample && tab === "Authority" && (
             <div className="row">
               <div className="grow">Per-capability authority envelopes · kill switch · autonomy progression.</div>
             </div>
           )}
 
-          {tab === "Models" && (
+          {deployment.sample && tab === "Models" && (
             <div className="row">
               <div className="grow">Adaptive model · local-first where possible.</div>
             </div>
           )}
 
-          {tab === "Security" && (
+          {deployment.sample && tab === "Security" && (
             <div className="row">
               <div className="grow"><div className="t">Credential broker</div>
                 <div className="mono s">secret:// · keys never enter chat, logs, or model context</div></div>
@@ -112,7 +117,7 @@ export function Settings(props: { client: DataClient; go: (s: Section) => void; 
             </div>
           )}
 
-          {tab === "Retention" && (
+          {deployment.sample && tab === "Retention" && (
             <div className="row">
               <div className="grow">Immutable event ledger · content-addressed evidence · retention policy.</div>
             </div>
@@ -120,7 +125,7 @@ export function Settings(props: { client: DataClient; go: (s: Section) => void; 
         </div>
       </div>
 
-      <div className="demoflag">Durable project configuration — example values in this standalone build.</div>
+      {deployment.sample ? <div className="demoflag">Durable project configuration — example values in this standalone build.</div> : null}
     </section>
   );
 }

@@ -26,6 +26,7 @@ import { Activity } from "./views/Activity";
 import { Settings } from "./views/Settings";
 import { makeClient, type DataClient } from "./data/client";
 import type { ProjectOverview, SidekickContext } from "./data/types";
+import { deployment, setDeployment } from "./data/deployment";
 
 const SECTION_LABEL: Record<Section, string> = {
   today: "Today", dashboards: "Dashboards", overview: "Overview", missions: "Missions", inspection: "Deployment Inspection",
@@ -67,7 +68,18 @@ export function App({ client }: { client?: DataClient }) {
     setSkOpen(true);
   }
 
-  useEffect(() => { api.getOverview("customer-ops").then(setOverview).catch(() => { /* the connection banner explains it */ }); }, [api]);
+  // Which project this deployment has and whether it serves demo fixtures: asked once, before any screen is shown, so no screen
+  // fetches with the wrong project or flashes demo content on a real deployment.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let live = true;
+    api.listProjects().then((ps) => {
+      const p = ps[0];
+      if (p) setDeployment({ projectId: p.id, projectName: p.name, sample: p.sample !== false });
+    }).catch(() => { setDeployment({ sample: false }); /* unknown server: show no demo content; the connection banner explains the rest */ })
+      .finally(() => { if (live) { setReady(true); api.getOverview(deployment.projectId).then((o) => { if (live) setOverview(o); }).catch(() => { /* the connection banner explains it */ }); } });
+    return () => { live = false; };
+  }, [api]);
   useEffect(() => {     // back/forward and desktop deep links (hash changes) navigate without a reload
     const onHash = () => {
       const r = parseHash(window.location.hash);
@@ -88,8 +100,8 @@ export function App({ client }: { client?: DataClient }) {
   }, []);
 
   const ctx: SidekickContext = section === "dashboards"
-    ? { projectId: dashProject || "customer-ops", section: SECTION_LABEL[section], objectRef: dashRef }
-    : { projectId: "customer-ops", section: SECTION_LABEL[section] };
+    ? { projectId: dashProject || deployment.projectId, section: SECTION_LABEL[section], objectRef: dashRef }
+    : { projectId: deployment.projectId, section: SECTION_LABEL[section] };
 
   function view() {
     switch (section) {
@@ -116,7 +128,7 @@ export function App({ client }: { client?: DataClient }) {
   }
 
   return (
-    <div className="app">
+    <div className={`app${skOpen ? " sk-open" : ""}`}>
       <a className="skip" href="#main">Skip to content</a>
       <Rail section={section} onNavigate={setSection} badges={{ today: notif.state?.count ?? todayCount ?? 0 }} />
       <div className="main">
@@ -124,7 +136,7 @@ export function App({ client }: { client?: DataClient }) {
           onDashboards={() => setSection("dashboards")} onDashboardsNow={section === "dashboards"} />
         <ConnectionBanner problem={notif.problem} onRetry={() => void notif.refresh()} />
         <SectionTabs section={section} onNavigate={setSection} />
-        <main id="main" tabIndex={-1} className="viewport"><ErrorBoundary resetKey={section}>{view()}</ErrorBoundary></main>
+        <main id="main" tabIndex={-1} className="viewport"><ErrorBoundary resetKey={section}>{ready ? view() : <section className="content"><div className="placeholder" role="status">Loading…</div></section>}</ErrorBoundary></main>
       </div>
       <NotificationToasts pending={notif.state?.pending ?? []}
         onOpen={(n) => { setSection("today"); setFocusItem(n.id); void notif.ack([n.key]); }}

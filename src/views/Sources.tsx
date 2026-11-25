@@ -3,6 +3,7 @@ import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import { Pill } from "../components/Pill";
 import type { ContextSource, Health, SourceHealthState, SourceProposal } from "../data/types";
+import { deployment } from "../data/deployment";
 
 type Tab = "connected" | "add" | "indexes" | "permissions" | "health";
 
@@ -112,7 +113,7 @@ function AddSource({ client, go, onConnected }: {
   const [driveAuthed, setDriveAuthed] = useState(false);
 
   async function connectSpec(spec: SourceProposal["sources"][number]) {
-    const [created] = await client.confirmSources("customer-ops", [spec], "you");
+    const [created] = await client.confirmSources(deployment.projectId, [spec], "you");
     if (created) { setScanned(created); onConnected(created); }
   }
 
@@ -277,7 +278,7 @@ export function Sources({ client, go }: { client: DataClient; go: (s: Section) =
   const [tab, setTab] = useState<Tab>("connected");
 
   useEffect(() => {
-    client.getSources("customer-ops").then(setSources);
+    client.getSources(deployment.projectId).then(setSources);
   }, [client]);
 
   if (!sources) {

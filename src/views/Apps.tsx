@@ -3,6 +3,7 @@ import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import { Pill } from "../components/Pill";
 import type { AppCapability, Health, SetupState } from "../data/types";
+import { deployment } from "../data/deployment";
 
 type Tab = "connected" | "available" | "health" | "permissions";
 
@@ -127,7 +128,7 @@ export function Apps({ client, go }: { client: DataClient; go: (s: Section) => v
   const [demoStatus, setDemoStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    client.getApps("customer-ops").then(setApps);
+    client.getApps(deployment.projectId).then(setApps);
   }, [client]);
 
   if (!apps) {
@@ -157,7 +158,8 @@ export function Apps({ client, go }: { client: DataClient; go: (s: Section) => v
         <h1 className="h">Apps</h1>
       </div>
 
-      {/* Killer-demo readiness card */}
+      {/* Killer-demo readiness card: a demo chain and a demo button, so only on a sample deployment */}
+      {deployment.sample ? (
       <div className="card">
         <div className="hd">
           <span className="eyebrow">Killer demo</span>
@@ -179,6 +181,7 @@ export function Apps({ client, go }: { client: DataClient; go: (s: Section) => v
           </div>
         </div>
       </div>
+      ) : null}
 
       <div className="tabsrow" role="tablist">
         {TABS.map((t) => (
@@ -236,7 +239,8 @@ export function Apps({ client, go }: { client: DataClient; go: (s: Section) => v
             <div className="hd"><span className="eyebrow">Context grants · what each app may be read as evidence</span>
               <button className="btn sm" style={{ marginLeft: "auto" }} onClick={() => go("sources")}>Open Sources</button></div>
             <div className="bd">
-              {Object.entries(CONTEXT_GRANTS).map(([provider, g]) => (
+              {!deployment.sample ? <div className="s">No context grant is recorded on this deployment.</div> : null}
+              {(deployment.sample ? Object.entries(CONTEXT_GRANTS) : []).map(([provider, g]) => (
                 <div className="row" key={provider}>
                   <div className="colw mono">{provider}</div>
                   <div className="grow" style={{ flexWrap: "wrap", display: "flex", gap: 6 }}>
