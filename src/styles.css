@@ -267,6 +267,16 @@ main.viewport{display:block;min-width:0;outline:none}
 .dash-empty{color:var(--ink-2);padding:14px 0 4px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
 .dash-empty .s{color:var(--muted);font-size:13px}
 .connectlist{margin:0;padding-left:18px;color:var(--ink-2)}
+/* Dashboards that are not offered: why, what each needs, how to enable it. The summary is a full-height control (WCAG 2.5.8). */
+.unavail{padding:0 16px}
+.unavail-sum{cursor:pointer;min-height:24px;padding:12px 0;color:var(--ink-2);font-size:13.5px}
+.unavail-list{list-style:none;margin:0;padding:0 0 12px;display:flex;flex-direction:column;gap:14px}
+.unavail-list>li{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:6px}
+.unavail-list p{margin:0;color:var(--ink-2);font-size:13.5px}
+.unavail-list p.s{color:var(--muted)}
+.unavail-t{margin:0;font-size:14.5px}
+.unavail-how{color:var(--ink-2);overflow-wrap:anywhere}
+.unavail .connectlist li{margin:4px 0;overflow-wrap:anywhere}
 .dash-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .dash-grid[aria-busy="true"]{opacity:.72}
 .panel{min-width:0}

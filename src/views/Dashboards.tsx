@@ -3,7 +3,7 @@ import { Bars, DataTable, Funnel, Matrix, SeriesTable, Stacked, StatTile, TimeSe
 import { Pill } from "../components/Pill";
 import type { Section } from "../components/Rail";
 import { classifyConnectionError, type DataClient } from "../data/client";
-import type { DashAction, DashCatalog, DashDrill, DashFilters, DashLayout, DashPanel, DashRow, DashSource, DashView, Dashboard, MatrixRow } from "../data/dashboards";
+import type { DashAction, DashCatalog, NotOffered, DashDrill, DashFilters, DashLayout, DashPanel, DashRow, DashSource, DashView, Dashboard, MatrixRow } from "../data/dashboards";
 import type { Health } from "../data/types";
 
 // Dashboards — analytical projections the runtime computed over what is connected. This view decides nothing: every
@@ -163,9 +163,9 @@ export function Dashboards({ client, go, ask, initial, onContext }: DashboardsPr
         <div><div className="eyebrow">Dashboards</div><h1 className="h">Nothing to chart yet</h1></div>
         <div className="card"><div className="bd dash-empty">
           {catalog.access.scoped ? "You have not been given access to any dashboard on this deployment." : "A dashboard appears as soon as the application it reads is connected."}
-          {catalog.not_connected.length > 0 && <ul className="connectlist">{catalog.not_connected.map((d) => <li key={d.id}><b>{d.title}</b> — connect {d.connect.join(" or ")}</li>)}</ul>}
           <div><button className="btn pri" onClick={() => go("apps")}>Open Connections</button></div>
         </div></div>
+        <Unavailable list={catalog.not_connected} open />
       </section>
     );
   }
@@ -251,9 +251,7 @@ export function Dashboards({ client, go, ask, initial, onContext }: DashboardsPr
         </div>
       )}
       {!customize && hidden.size > 0 && dash && <div className="demoflag">{hidden.size} panel{hidden.size === 1 ? "" : "s"} hidden in this view · <button className="linkish" onClick={() => setCustomize(true)}>Customize</button></div>}
-      {catalog.not_connected.length > 0 && (
-        <div className="demoflag">{catalog.not_connected.length} more dashboard{catalog.not_connected.length === 1 ? "" : "s"} appear when their applications are connected: {catalog.not_connected.map((d) => d.title).join(", ")}. <button className="linkish" onClick={() => go("apps")}>Open Connections</button></div>
-      )}
+      <Unavailable list={catalog.not_connected} />
       {!catalog.history.durable && <div className="demoflag">History is kept in memory on this deployment and starts again after a restart.</div>}
 
       {drill && dash && <DrillDrawer client={client} dashboard={dash} at={drill} filters={filters} onClose={() => setDrill(null)} go={go} ask={ask} />}
@@ -392,5 +390,36 @@ function DrillDrawer({ client, dashboard, at, filters, onClose, go, ask }: {
         </div>
       </aside>
     </>
+  );
+}
+
+/** The dashboards this deployment does not offer: for each, why it is missing, which application(s) it needs, and how each is
+ *  enabled, in the server's own words. A line of titles ("3 more dashboards appear when their applications are connected")
+ *  told a person that something was missing and nothing about what to do. */
+export function Unavailable({ list, open = false }: { list: NotOffered[]; open?: boolean }) {
+  if (list.length === 0) return null;
+  return (
+    <details className="card unavail" open={open}>
+      <summary className="unavail-sum">{list.length} dashboard{list.length === 1 ? " is" : "s are"} not available here — why, and how to enable {list.length === 1 ? "it" : "them"}</summary>
+      <ul className="unavail-list" aria-label="Dashboards that are not available here">
+        {list.map((d) => (
+          <li key={d.id}>
+            <h3 className="unavail-t">{d.title}</h3>
+            {d.about && <p className="s">{d.about}</p>}
+            <p><b>Why it is not shown:</b> {d.why || "The application it reads is not connected on this deployment."}</p>
+            {d.needs && d.needs.length > 0 ? (
+              <>
+                <p><b>{d.needs.length === 1 ? "It needs:" : "It needs one of:"}</b></p>
+                <ul className="connectlist">
+                  {d.needs.map((n) => (
+                    <li key={n.id}><b>{n.label}</b>{n.detail ? ` — ${n.detail}` : ""}{n.remedy ? <><br /><span className="unavail-how"><b>To enable it:</b> {n.remedy}</span></> : null}</li>
+                  ))}
+                </ul>
+              </>
+            ) : <p><b>It needs:</b> {d.connect.join(" or ")}. Connect it under Connections.</p>}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

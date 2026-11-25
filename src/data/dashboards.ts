@@ -31,8 +31,14 @@ export interface Dashboard {
   empty: string; advanced: { label: string; url: string; app: string }[];
 }
 export interface CatalogEntry { id: string; title: string; priority: string; group: string; about: string; sources: { id: string; label: string; state: SourceState }[] }
+/** A dashboard this deployment does not offer. `why`, `about` and `needs` come from kernels that explain it (0.4.16 and the
+ *  desktop line after 0.1.4); an older kernel sends the title and `connect` only. */
+export interface NotOffered {
+  id: string; title: string; priority: string; connect: string[]; about?: string; why?: string;
+  needs?: { id: string; label: string; state: SourceState; detail: string; remedy: string }[];
+}
 export interface DashCatalog {
-  dashboards: CatalogEntry[]; not_connected: { id: string; title: string; priority: string; connect: string[] }[];
+  dashboards: CatalogEntry[]; not_connected: NotOffered[];
   projects: DashProject[]; access: { principal: string; scoped: boolean; basis: string; can_save?: boolean };
   history: { durable: boolean }; config_errors: number; generated_at: number;
 }
