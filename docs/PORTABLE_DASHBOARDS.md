@@ -33,7 +33,7 @@ the browser cache afterwards). Four dashboards work:
 What you add stays in this browser (IndexedDB) and survives a reload. The same rules apply as on a server: a skipped test
 is blocked or unsupported, never passed; a platform you declare and do not report shows as not executed.
 
-**Not available in this browser**, and listed on the page with what each needs: Security and remediation, Revenue and
+**Not available in this browser**; the dashboards view lists each with why and what to do: Security and remediation, Revenue and
 sales, Financial health, Market and conversion, Customer support, Suppliers and procurement, Marketing and social, AI
 usage and cost, Knowledge and data quality. They read your applications with each application's credential, and a
 credential in a web page belongs to everyone who can open the page. Connect to a deployment that holds those

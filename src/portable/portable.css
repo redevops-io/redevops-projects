@@ -11,8 +11,5 @@
 .pt-err{color:var(--bad);font-size:13px}
 .pt-ok{color:var(--ok);font-size:13px}
 .pt-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end}
-.pt-un{margin-top:22px}
-.pt-un ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
-.pt-un li{font-size:13px;line-height:1.45}
-.pt-un li b{display:inline-block;min-width:190px}
+.pt-about{margin-top:18px}
 .pt .content{padding-left:0;padding-right:0}
