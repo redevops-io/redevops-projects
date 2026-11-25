@@ -44,7 +44,8 @@ connections instead.
 `npm run build:portable` writes `dist-portable/` and the archive, and prints the archive's sha256. Inputs are pinned:
 Pyodide by npm version, its two packages (pyyaml, sqlite3) by the sha256 in Pyodide's lock file, the dashboards kernel
 archive (`dashboards-kernel.zip`, a release asset of agentic-os) by the sha256 in `portable.lock.json`. The archive is
-reproducible: the same inputs give the same sha256. `portable-manifest.json` in the folder lists every file with its
+written deterministically (sorted entries, no timestamps): the same inputs built with the same Node and Vite give the
+same sha256. The published digest is the one in the release's `SHA256SUMS`. `portable-manifest.json` in the folder lists every file with its
 sha256.
 
 A static host should send `Content-Type: application/wasm` for `.wasm` and `text/javascript` for `.mjs` (most do).
