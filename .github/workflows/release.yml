@@ -31,6 +31,9 @@ jobs:
           tar -C dist -czf out/projects-ui-root.tgz .
           VITE_PROJECTS_API=/projects npm run build -- --base=/projects/
           tar -C dist -czf out/projects-ui-projects.tgz .
+          # the portable dashboards page (remote + standalone WebAssembly); its kernel archive is pinned in portable.lock.json
+          npm run build:portable
+          cp projects-dashboards-portable.tgz out/
           (cd out && sha256sum *.tgz > SHA256SUMS)
           cat out/SHA256SUMS
       - name: Publish release assets
