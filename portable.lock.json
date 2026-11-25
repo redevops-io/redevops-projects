@@ -3,8 +3,8 @@
   "packages_base": "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/",
   "kernel": {
     "repo": "redevops-io/agentic-os",
-    "version": "v0.4.16",
+    "version": "v0.4.17",
     "asset": "dashboards-kernel.zip",
-    "sha256": "f7694351cc0575cfc0788dc8eb1064e312425ada3dbffa23a00459351835fcdc"
+    "sha256": "13e397c17f97fe9e8373bb643b00adb35f0a8ad923a75c2cefb32758440c7799"
   }
 }
