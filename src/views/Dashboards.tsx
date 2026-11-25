@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bars, DataTable, Funnel, Matrix, SeriesTable, Stacked, StatTile, TimeSeries, fmt, safeHref } from "../components/charts";
+import { Bars, DataTable, Funnel, Matrix, SeriesTable, Stacked, StatTile, TimeSeries, exact, safeHref } from "../components/charts";
 import { Pill } from "../components/Pill";
 import type { Section } from "../components/Rail";
 import { classifyConnectionError, type DataClient } from "../data/client";
@@ -377,7 +377,7 @@ function DrillDrawer({ client, dashboard, at, filters, onClose, go, ask }: {
                         <tr key={`${r.source}:${r.id}`}>
                           <td>{r.title || r.id}</td>
                           <td>{r.status.replace(/_/g, " ").toLowerCase() || "—"}</td>
-                          {cols.map((c) => { const v = r.fields[c]; return <td key={c}>{v === null || v === undefined || v === "" ? "—" : typeof v === "number" ? fmt(v) : String(v)}</td>; })}
+                          {cols.map((c) => { const v = r.fields[c]; return <td key={c}>{v === null || v === undefined || v === "" ? "—" : typeof v === "number" ? exact(v) : String(v)}</td>; })}
                           <td className="tnum">{when(r.at)}</td>
                           <td className="mono ref">{r.ref}</td>
                           <td className="r">{safeHref(r.url) ? <a href={safeHref(r.url)} target="_blank" rel="noreferrer noopener" aria-label={`Open ${r.title || r.id} in its application`}>Open ↗</a> : null}</td>

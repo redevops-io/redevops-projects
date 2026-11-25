@@ -23,6 +23,12 @@ export function fmt(v: number | null | undefined, unit = ""): string {
   return unit ? `${n} ${unit}` : n;
 }
 
+/** The exact value, for a table: a tile may say "31.3k", the table behind it says 31,287. A table is where a number is checked. */
+export function exact(v: number | null | undefined): string {
+  if (v === null || v === undefined || Number.isNaN(v)) return "—";
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(v);
+}
+
 const UNKNOWN: Record<string, string> = {
   source_unavailable: "The source is not answering", unauthorized: "You do not have access to this", not_connected: "Not connected",
   no_data: "No data in this range", no_traceability: "No traceability yet",
@@ -196,7 +202,7 @@ export function Matrix({ columns, rows, onDrill }: { columns: DashColumn[]; rows
 }
 
 export function DataTable({ columns, rows, onDrill }: { columns: DashColumn[]; rows: DashRow[]; onDrill?: (key: string, label: string) => void }) {
-  const cell = (v: string | number | null | undefined): ReactNode => (v === null || v === undefined || v === "" ? <span className="nk">—</span> : typeof v === "number" ? fmt(v) : v);
+  const cell = (v: string | number | null | undefined): ReactNode => (v === null || v === undefined || v === "" ? <span className="nk">—</span> : typeof v === "number" ? exact(v) : v);
   return (
     <div className="tablewrap" tabIndex={0} role="region" aria-label="Table, scrolls sideways">
       <table className="dtable">
@@ -225,7 +231,7 @@ export function SeriesTable({ x, series }: { x: string[]; series: DashSeries[] }
     <div className="tablewrap tall" tabIndex={0} role="region" aria-label="Table, scrolls">
       <table className="dtable">
         <thead><tr><th scope="col">Period</th>{series.map((s) => <th key={s.id} scope="col" className="r">{s.label}</th>)}</tr></thead>
-        <tbody>{x.map((label, i) => <tr key={label}><td>{label}</td>{series.map((s) => <td key={s.id} className="r tnum">{fmt(s.values[i])}</td>)}</tr>)}</tbody>
+        <tbody>{x.map((label, i) => <tr key={label}><td>{label}</td>{series.map((s) => <td key={s.id} className="r tnum">{exact(s.values[i])}</td>)}</tr>)}</tbody>
       </table>
     </div>
   );
