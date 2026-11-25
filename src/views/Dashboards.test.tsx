@@ -38,7 +38,27 @@ describe("Dashboards", () => {
     const tabs = await screen.findByRole("tablist", { name: "Dashboards" });
     expect(within(tabs).getAllByRole("tab").map((t) => t.textContent)).toEqual(fx.catalog.dashboards.map((d) => d.title));
     expect(within(tabs).queryByRole("tab", { name: "Revenue and sales" })).toBeNull();
-    expect(await screen.findByText(/more dashboards appear when their applications are connected/)).toBeTruthy();
+    expect(await screen.findByText(/dashboards? (is|are) not available here/)).toBeTruthy();
+  });
+
+  it("says for each unavailable dashboard why it is missing, what it needs and how to enable it", async () => {
+    const c = new MockDataClient();
+    c.getDashboardCatalog = async () => ({ ...fx.catalog, not_connected: [
+      { id: "revenue", title: "Revenue and sales", priority: "P1", connect: ["Control Tower (Metabase)", "Twenty CRM"], about: "Pipeline and bookings.",
+        why: "None of the applications this dashboard reads is connected on this deployment; connecting any one of them makes it appear.",
+        needs: [{ id: "twenty", label: "Twenty CRM", state: "not_connected", detail: "this source is not enabled on this deployment", remedy: "create the dashboards file /home/u/dashboards.yaml with `twenty` listed under `sources`" },
+                { id: "metabase", label: "Control Tower (Metabase)", state: "not_connected", detail: "no Metabase connection is configured", remedy: "set METABASE_API_URL" }] },
+      { id: "qa", title: "QA and release readiness", priority: "P0", connect: ["QA runs"] }] });     // an older kernel: title and names only
+    show(c);
+    const list = await screen.findByRole("list", { name: "Dashboards that are not available here" });
+    const rev = within(list).getByRole("heading", { name: "Revenue and sales" }).closest("li") as HTMLElement;
+    expect(within(rev).getByText(/None of the applications this dashboard reads is connected/)).toBeTruthy();
+    expect(within(rev).getByText("It needs one of:")).toBeTruthy();
+    expect(within(rev).getByText("Twenty CRM")).toBeTruthy();
+    expect(within(rev).getByText(/create the dashboards file \/home\/u\/dashboards.yaml/)).toBeTruthy();
+    expect(within(rev).getByText(/set METABASE_API_URL/)).toBeTruthy();
+    const qa = within(list).getByRole("heading", { name: "QA and release readiness" }).closest("li") as HTMLElement;
+    expect(within(qa).getByText(/QA runs\. Connect it under Connections\./)).toBeTruthy();
   });
 
   it("renders the runtime's numbers verbatim and never shows an unknown value as zero", async () => {
@@ -128,7 +148,7 @@ describe("Dashboards", () => {
     empty.getDashboardCatalog = async () => ({ ...fx.catalog, dashboards: [], not_connected: [{ id: "qa", title: "QA and release readiness", priority: "P0", connect: ["QA runs"] }] });
     const a = show(empty);
     expect(await screen.findByRole("heading", { name: "Nothing to chart yet" })).toBeTruthy();
-    expect(screen.getByText(/connect QA runs/)).toBeTruthy();
+    expect(screen.getByText(/QA runs\. Connect it under Connections\./)).toBeTruthy();
     a.unmount();
     const refused = new MockDataClient();
     refused.getDashboard = async () => { throw new TodayApiError(403, "forbidden", "no"); };
