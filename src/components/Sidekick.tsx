@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DataClient } from "../data/client";
 import type { Section } from "./Rail";
 import type { SidekickContext } from "../data/types";
+import { deployment } from "../data/deployment";
 
 interface Msg { who: "you" | "sk"; text: string; actions?: { label: string; kind: string; ref?: string }[]; }
 
@@ -72,7 +73,7 @@ export function Sidekick({ open, ctx, client, onClose, seed, go }:
           <span className="pill mut" style={{ marginLeft: 6 }}><span className="dot" />Mission Supervisor</span>
           <button className="x" onClick={onClose} aria-label="Close">✕</button>
         </div>
-        <div className="ctxchip">Project <b>Customer Operations</b> · Section <b>{ctx.section}</b>{objectLine}</div>
+        <div className="ctxchip">Project <b>{deployment.projectName}</b> · Section <b>{ctx.section}</b>{objectLine}</div>
         <div className="body" ref={bodyRef}>
           {msgs.map((m, i) => (
             <div key={i} className={`msg ${m.who}`}>

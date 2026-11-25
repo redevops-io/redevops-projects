@@ -15,13 +15,34 @@ function useLimit(): number {
   return n;
 }
 
+export const FOLD_AFTER_MS = 8000;
+
 // In-app only (native/desktop notifications come later, with the same content-free rule for lock screens).
 // Shows the few newest actionable items; "Open" jumps to Today with that item selected.
 export function NotificationToasts({ pending, onOpen, onDismiss, onDismissAll }: {
   pending: TodayNotification[]; onOpen: (n: TodayNotification) => void; onDismiss: (n: TodayNotification) => void; onDismissAll: () => void;
 }) {
   const limit = useLimit();
+  // A toast announces something new; it must not keep covering the page it floats over. After a short while the stack folds into
+  // one small chip (the count stays visible, one click brings the stack back), and a NEW item unfolds it again.
+  const newest = pending[0]?.key ?? "";
+  const [folded, setFolded] = useState(false);
+  useEffect(() => {
+    setFolded(false);
+    if (!newest) return;
+    const t = setTimeout(() => setFolded(true), FOLD_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [newest]);
   if (!pending.length) return null;
+  if (folded) {
+    return (
+      <div className="toasts folded" role="status" aria-live="off" aria-label="Items that need you">
+        <button className="toast chip" onClick={() => setFolded(false)} aria-label={`${pending.length} item${pending.length === 1 ? "" : "s"} need you. Show`}>
+          <span className="dot" aria-hidden="true" />{pending.length} need{pending.length === 1 ? "s" : ""} you
+        </button>
+      </div>
+    );
+  }
   const shown = pending.slice(0, limit), more = pending.length - shown.length;
   return (
     <div className="toasts" role="status" aria-live="polite" aria-label="New items that need you">

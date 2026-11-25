@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import type { ActivityEvent, SourceRuntime } from "../data/types";
+import { deployment } from "../data/deployment";
 
 // The Activity view (P8) renders the event ledger projected across Runtimes. Each event
 // carries its source_runtime provenance, so the filter row is a lens onto one Runtime's
@@ -21,7 +22,7 @@ export function Activity({ client }: { client: DataClient; go: (s: Section) => v
   const [filter, setFilter] = useState<Filter>("all");
 
   useEffect(() => {
-    client.getActivity("customer-ops").then(setEvents);
+    client.getActivity(deployment.projectId).then(setEvents);
   }, [client]);
 
   if (!events) {
@@ -58,7 +59,7 @@ export function Activity({ client }: { client: DataClient; go: (s: Section) => v
         </div>
       </div>
 
-      <div className="demoflag">One immutable ledger; each filter is a lens onto a Runtime's contribution — example data via the mock Projects API client.</div>
+      {deployment.sample ? <div className="demoflag">One immutable ledger; each filter is a lens onto a Runtime's contribution — example data via the mock Projects API client.</div> : null}
     </section>
   );
 }

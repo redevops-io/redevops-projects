@@ -3,12 +3,12 @@ import { Pill } from "../components/Pill";
 import type { Section } from "../nav";
 import { TodayApiError, classifyConnectionError, type DataClient } from "../data/client";
 import type { BatchRequest, CaptureItem, Health, TodayDetail, TodayFeed, TodayItem, TodayLifecycle, TodayRecipient, TodayState } from "../data/types";
+import { deployment } from "../data/deployment";
 
 // Today — the default landing (CONTROL_SURFACES_UX plan §3). One ranked queue of what needs a human, in
 // domain language, with the next safe action beside it. Every state, priority, approval and digest is rendered
 // as the server sent it; this view never derives them. Approving binds the exact payload the user reviewed.
 
-const PROJECT = "customer-ops";
 const BUDGET = 7;                       // visible "needs your decision" rows before "Show more" (none are dropped)
 const SNOOZES: { label: string; seconds: number }[] = [
   { label: "1 hour", seconds: 3600 }, { label: "Tomorrow", seconds: 86400 }, { label: "3 days", seconds: 3 * 86400 }, { label: "Next week", seconds: 7 * 86400 },
@@ -89,7 +89,7 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
 
   const loadFeed = useCallback(async () => {
     try {
-      const f = await client.getToday(PROJECT);
+      const f = await client.getToday(deployment.projectId);
       if (!live.current) return f;
       setFeed(f); setErr(null); setLoadError(null);
       onCount?.(f.counts.needs_action ?? 0);
@@ -121,7 +121,7 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
   const loadIntake = useCallback(async () => {
     if (!feed || !canCapture) return;
     try {
-      const l = await client.listCaptures(PROJECT);
+      const l = await client.listCaptures(deployment.projectId);
       // Intake holds only what has no home in Today yet: waiting on one answer, or an investigation candidate.
       // A scheduled reminder and a note linked to a case already live in Today.
       if (live.current) setIntake(l.filter((c) => c.status === "needs_clarification" || c.routing?.kind === "investigation_candidate"));
@@ -135,7 +135,7 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
     if (batchBusy || !picked.length) return;
     setBatchBusy(true); setBatchNote(null); setCapNote(null);
     try {
-      const r = await client.batchToday(PROJECT, { ...req, item_ids: picked });
+      const r = await client.batchToday(deployment.projectId, { ...req, item_ids: picked });
       if (!live.current) return;
       const failed = r.results.filter((x) => !x.ok);
       const why = failed.length ? ` ${failed.length} couldn't be changed: ${[...new Set(failed.map((f) => f.detail ?? f.error))].join("; ")}` : "";
@@ -148,7 +148,7 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
   }
   async function undoBatch(token: string) {
     try {
-      const r = await client.undoBatch(PROJECT, token);
+      const r = await client.undoBatch(deployment.projectId, token);
       const skipped = r.results.filter((x) => !x.restored).length;
       setBatchNote({ tone: skipped ? "warn" : "ok", text: `Undone for ${r.restored_count} item${r.restored_count === 1 ? "" : "s"}.${skipped ? ` ${skipped} had changed since, so they were left as you set them.` : ""}` });
       await loadFeed(); if (sel) await loadDetail(sel);
@@ -160,7 +160,7 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
     if (!t || capBusy) return;
     setCapBusy(true); setCapNote(null);
     try {
-      const c = await client.capture(PROJECT, t);
+      const c = await client.capture(deployment.projectId, t);
       if (!live.current) return;
       setText("");
       const r = c.routing;
@@ -176,20 +176,20 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
   }
   async function resolveIntake(c: CaptureItem, caseId: string) {
     try {
-      const r = await client.resolveCapture(PROJECT, c.id, caseId);
+      const r = await client.resolveCapture(deployment.projectId, c.id, caseId);
       setCapNote({ tone: "ok", text: `Linked to “${r.routing?.title ?? "the case"}”. Nothing has been sent.` });
       await loadFeed(); await loadIntake();
       if (r.routing?.item_id) setSel(r.routing.item_id);
     } catch (e) { setCapNote({ tone: "bad", text: (e as Error).message ?? String(e) }); }
   }
   async function archiveIntake(c: CaptureItem) {
-    try { await client.archiveCapture(PROJECT, c.id); await loadIntake(); } catch (e) { setCapNote({ tone: "bad", text: (e as Error).message ?? String(e) }); }
+    try { await client.archiveCapture(deployment.projectId, c.id); await loadIntake(); } catch (e) { setCapNote({ tone: "bad", text: (e as Error).message ?? String(e) }); }
   }
 
   const loadDetail = useCallback(async (id: string, t?: string[], ident?: string) => {
     if (!canDetail) return;
     try {
-      const d = await client.getTodayItem(PROJECT, id, { targets: t, identityId: ident });
+      const d = await client.getTodayItem(deployment.projectId, id, { targets: t, identityId: ident });
       if (live.current) {
         setDetail(normalizeDetail(d));
         if (!t && !ident) setRoster(d.action ? { to: d.action.to, skipped: d.action.skipped } : null);
@@ -494,28 +494,28 @@ export function Today({ client, go, onCount, focusItem, onFocused }: { client: D
               <div className="actions">
                 {act && (detail.state === "needs_action" || detail.state === "failed" || detail.state === "scheduled") && !detail.resurfaced && detail.lifecycle.sent === false && (
                   <button className="btn pri" disabled={busy || !act.can_approve}
-                    onClick={() => run(() => client.approveToday(PROJECT, detail.id, { payload_digest: act.payload_digest!, targets, identity_id: identity }),
+                    onClick={() => run(() => client.approveToday(deployment.projectId, detail.id, { payload_digest: act.payload_digest!, targets, identity_id: identity }),
                       (d) => d.state === "failed" ? d.status_line ?? "Not sent." : d.replayed ? "Already sent — nothing was sent again." : "Approved and sent. It comes back to your queue if there's no response.")}>
                     {busy ? "Working…" : detail.state === "failed" ? "Review & retry" : "Approve & send"}
                   </button>
                 )}
                 {detail.resurfaced && <span className="s">No response yet — it is back in your queue so it is not lost.</span>}
                 {detail.kind === "reminder" && detail.state !== "dismissed" && (
-                  <button className="btn pri" disabled={busy} onClick={() => run(() => client.dismissToday(PROJECT, detail.id), () => "Marked done.")}>Mark done</button>
+                  <button className="btn pri" disabled={busy} onClick={() => run(() => client.dismissToday(deployment.projectId, detail.id), () => "Marked done.")}>Mark done</button>
                 )}
                 {!act && detail.kind === "signal" && <button className="btn" onClick={() => go("attention")}>Open in Attention</button>}
                 {selectable(detail) && detail.state !== "verified" && detail.state !== "dismissed" && (
                   <label className="snooze s">Snooze this item
-                    <select aria-label="Snooze" disabled={busy} value="" onChange={(e) => { const v = Number(e.target.value); if (v) void run(() => client.snoozeToday(PROJECT, detail.id, v), () => "Snoozed — it will come back."); }}>
+                    <select aria-label="Snooze" disabled={busy} value="" onChange={(e) => { const v = Number(e.target.value); if (v) void run(() => client.snoozeToday(deployment.projectId, detail.id, v), () => "Snoozed — it will come back."); }}>
                       <option value="">…</option>{SNOOZES.map((s) => <option key={s.seconds} value={s.seconds}>{s.label}</option>)}
                     </select>
                   </label>
                 )}
                 {act && !detail.lifecycle.sent && detail.state !== "dismissed" && (
-                  <button className="btn" disabled={busy} onClick={() => run(() => client.dismissToday(PROJECT, detail.id), () => "Dismissed.")}>Dismiss</button>
+                  <button className="btn" disabled={busy} onClick={() => run(() => client.dismissToday(deployment.projectId, detail.id), () => "Dismissed.")}>Dismiss</button>
                 )}
                 {feed.simulated_actions && detail.lifecycle.sent && !detail.lifecycle.outcome_observed && (
-                  <button className="btn" disabled={busy} onClick={() => run(() => client.simulateTodayOutcome(PROJECT, detail.id), () => "Outcome recorded (simulated).")}>Simulate: customer responded</button>
+                  <button className="btn" disabled={busy} onClick={() => run(() => client.simulateTodayOutcome(deployment.projectId, detail.id), () => "Outcome recorded (simulated).")}>Simulate: customer responded</button>
                 )}
               </div>
 

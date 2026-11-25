@@ -3,6 +3,7 @@ import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import type { SocialMissionView, Health } from "../data/types";
 import { Pill } from "../components/Pill";
+import { deployment } from "../data/deployment";
 
 // The source status STRING comes straight from the projection; tone only colours it. Availability is
 // never re-derived client-side.
@@ -16,7 +17,7 @@ export function SocialIntel({ client, ask }:
   const [data, setData] = useState<SocialMissionView | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
-    client.getSocialIntelligence("customer-ops").then(setData).catch((e) => setErr(String(e)));
+    client.getSocialIntelligence(deployment.projectId).then(setData).catch((e) => setErr(String(e)));
   }, [client]);
 
   if (err) return <section className="content"><div className="placeholder">Couldn't load — {err}</div></section>;

@@ -15,6 +15,8 @@ export interface Provenance {
 export type Health = "ok" | "warn" | "bad" | "run" | "mut";
 
 export interface ProjectRef {
+  /** false on a deployment that serves no demo fixtures (a production deployment); absent on older servers. */
+  sample?: boolean;
   id: string;
   name: string;
   health: Health;

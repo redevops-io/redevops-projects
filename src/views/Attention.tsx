@@ -3,6 +3,7 @@ import { Pill } from "../components/Pill";
 import type { Section } from "../components/Rail";
 import type { DataClient } from "../data/client";
 import type { AttentionItem, AttentionKind, Health } from "../data/types";
+import { deployment } from "../data/deployment";
 
 // P3 — one cross-Runtime "what needs me" queue. Every item is an AttentionItem projection
 // (source_ref · kind · consequence · actions), grouped by kind into cards. Projects renders
@@ -30,7 +31,7 @@ export function Attention({ client, go }: { client: DataClient; go: (s: Section)
 
   useEffect(() => {
     let live = true;
-    client.getAttention("customer-ops").then((a) => { if (live) setItems(a); });
+    client.getAttention(deployment.projectId).then((a) => { if (live) setItems(a); });
     return () => { live = false; };
   }, [client]);
 

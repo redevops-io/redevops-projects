@@ -3,6 +3,7 @@ import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import type { DeploymentInspection, DeploymentFinding, GovernedActionView, Health } from "../data/types";
 import { Pill } from "../components/Pill";
+import { deployment } from "../data/deployment";
 
 // Presentation-only tone maps. The LABEL rendered is always the projection's own string — these only
 // pick a colour. The card never re-derives severity, approval, verification or provider state.
@@ -19,7 +20,7 @@ export function Inspection({ client, ask }:
   const [data, setData] = useState<DeploymentInspection | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
-    client.getDeploymentInspection("customer-ops").then(setData).catch((e) => setErr(String(e)));
+    client.getDeploymentInspection(deployment.projectId).then(setData).catch((e) => setErr(String(e)));
   }, [client]);
 
   if (err) return <section className="content"><div className="placeholder">Couldn't load the inspection — {err}</div></section>;

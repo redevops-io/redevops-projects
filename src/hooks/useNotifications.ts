@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DataClient } from "../data/client";
 import type { NotificationPrefs, TodayNotifications } from "../data/types";
 import { classifyConnectionError, type ConnectionProblem } from "../data/client";
+import { deployment } from "../data/deployment";
 
 // Notifications are DERIVED from Today (same stable ids and state, no second workflow). The server decides what is
 // actionable, what is already acknowledged, and what quiet hours suppress; this hook only polls and relays.
 // A snoozed item is silent until it wakes. The window title uses the content-free summary only.
-export function useNotifications(client: DataClient, projectId = "customer-ops", intervalMs = 30_000) {
+export function useNotifications(client: DataClient, projectId = deployment.projectId, intervalMs = 30_000) {
   const [state, setState] = useState<TodayNotifications | null>(null);
   // null = reachable. Otherwise why not — shown as a slim banner while the last known state stays on screen.
   const [problem, setProblem] = useState<ConnectionProblem | null>(null);

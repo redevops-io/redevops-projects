@@ -1,6 +1,7 @@
 import { Pill } from "../components/Pill";
 import type { Section } from "../components/Rail";
 import type { Health, ProjectOverview, SourceHealthState, WorkflowState } from "../data/types";
+import { deployment } from "../data/deployment";
 
 const WF_TONE: Record<WorkflowState, "run" | "mut"> = { active: "run", scheduled: "run", paused: "mut" };
 const SRC_TONE: Record<SourceHealthState, Health> = { healthy: "ok", degraded: "warn", stale: "warn", error: "bad" };
@@ -113,7 +114,7 @@ export function Overview({ data, go }: { data: ProjectOverview; go: (s: Section)
         </div>
       </div>
 
-      <div className="demoflag">Overview composes projections across Missions · Workflows · Discovery · Apps · Sources · Runtime health — example data via the mock Projects API client.</div>
+      {deployment.sample ? <div className="demoflag">Overview composes projections across Missions · Workflows · Discovery · Apps · Sources · Runtime health — example data via the mock Projects API client.</div> : null}
     </section>
   );
 }

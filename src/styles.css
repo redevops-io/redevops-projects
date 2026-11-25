@@ -350,3 +350,18 @@ aside.drill{position:fixed;top:0;right:0;height:100vh;width:min(760px,96vw);back
 .topdash[aria-current="page"]{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-wash)}
 /* phone: the first row (project, Dashboards, health) never wraps, whatever the project name turns out to be; the name gives way */
 @media(max-width:820px){.topbar .proj{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}.topbar .topdash,.topbar>.pill{flex:none}}
+
+/* Sidekick beside the page, not over it. On a wide window the open panel takes its own column: the page (tabs, filters, panels)
+   narrows and stays fully visible and clickable, so asking a question never hides the navigation the answer points to. Narrow
+   windows keep the overlay, where a column would leave no room for the page. */
+@media(min-width:1100px){
+  .app.sk-open{padding-right:388px}
+  .app.sk-open .backdrop.open{opacity:0;pointer-events:none}
+  .app.sk-open aside.sk{box-shadow:none}
+  .app.sk-open .toasts{right:404px}
+  .app.sk-open aside.drill{right:388px}
+}
+/* notifications fold into one small chip after a moment, so they stop covering the page */
+.toast.chip{gap:7px;padding:6px 11px;border-radius:999px;font:inherit;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;min-height:32px}
+.toast.chip .dot{width:8px;height:8px;border-radius:50%;background:var(--warn,#b45309)}
+.toasts.folded{align-items:flex-end}

@@ -3,6 +3,7 @@ import type { DataClient } from "../data/client";
 import type { Section } from "../components/Rail";
 import { Pill } from "../components/Pill";
 import type { DiscoveryFinding } from "../data/types";
+import { deployment } from "../data/deployment";
 
 const TABS = ["Findings", "Evidence", "Sources", "Changes", "History"] as const;
 type Tab = (typeof TABS)[number];
@@ -21,7 +22,7 @@ export function Discovery({ client, go }: { client: DataClient; go: (s: Section)
   const [tab, setTab] = useState<Tab>("Findings");
 
   useEffect(() => {
-    client.getDiscovery("customer-ops").then(setFindings);
+    client.getDiscovery(deployment.projectId).then(setFindings);
   }, [client]);
 
   if (!findings) {
@@ -91,7 +92,8 @@ export function Discovery({ client, go }: { client: DataClient; go: (s: Section)
           <div className="hd"><span className="eyebrow">Sources</span></div>
           <div className="bd">
             <div className="row" style={{ flexWrap: "wrap" }}>
-              {SOURCES.map((s) => (
+              {!deployment.sample ? <span className="s">No source system is feeding Discovery on this deployment.</span> : null}
+              {(deployment.sample ? SOURCES : []).map((s) => (
                 <Pill key={s.label} tone={s.tone}>{s.label}</Pill>
               ))}
             </div>
