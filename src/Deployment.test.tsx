@@ -88,3 +88,27 @@ describe("nothing floats over the page for long", () => {
     expect(screen.getByText("New one")).toBeTruthy();                       // one click brings the stack back
   });
 });
+
+describe("the first paint does not wait for the deployment answer when it does not have to", () => {
+  it("a returning visit draws at once from the remembered answer and corrects itself if the server now says otherwise", async () => {
+    localStorage.setItem("redevops.deployment.v1", JSON.stringify({ projectId: "main", projectName: "Operations", sample: false }));
+    let release: (v: any) => void = () => {};
+    class Slow extends MockDataClient {
+      async listProjects() { return new Promise<any>((r) => { release = r; }); }
+    }
+    render(<App client={new Slow()} />);
+    expect(screen.queryByTestId("deployment-wait")).toBeNull();              // no wait: the remembered descriptor is used
+    expect(deployment).toMatchObject({ projectId: "main", sample: false });
+    await act(async () => { release([{ id: "ops-2", name: "Second", health: "ok", sample: false }]); });
+    await waitFor(() => expect(deployment.projectId).toBe("ops-2"));
+    expect(JSON.parse(localStorage.getItem("redevops.deployment.v1")!).projectId).toBe("ops-2");
+  });
+
+  it("a first visit to the dashboards draws without waiting", async () => {
+    window.location.hash = "#/dashboards/portfolio";
+    class Never extends MockDataClient { async listProjects() { return new Promise<any>(() => {}); } }
+    render(<App client={new Never()} />);
+    await waitFor(() => expect(screen.getAllByText(/Portfolio health/).length).toBeGreaterThan(0));
+    window.location.hash = "";
+  });
+});

@@ -26,7 +26,7 @@ import { Activity } from "./views/Activity";
 import { Settings } from "./views/Settings";
 import { makeClient, type DataClient } from "./data/client";
 import type { ProjectOverview, SidekickContext } from "./data/types";
-import { deployment, setDeployment } from "./data/deployment";
+import { deployment, recallDeployment, rememberDeployment, setDeployment } from "./data/deployment";
 
 const SECTION_LABEL: Record<Section, string> = {
   today: "Today", dashboards: "Dashboards", overview: "Overview", missions: "Missions", inspection: "Deployment Inspection",
@@ -70,12 +70,19 @@ export function App({ client }: { client?: DataClient }) {
 
   // Which project this deployment has and whether it serves demo fixtures: asked once, before any screen is shown, so no screen
   // fetches with the wrong project or flashes demo content on a real deployment.
-  const [ready, setReady] = useState(false);
+  // A returning visit starts from what this origin answered last time (no wait before the first paint); a first visit waits,
+  // except on the Dashboards, which need neither the project id nor the demo flag to draw.
+  const [ready, setReady] = useState(() => recallDeployment());
+  const [depRev, setDepRev] = useState(0);
   useEffect(() => {
     let live = true;
     api.listProjects().then((ps) => {
       const p = ps[0];
-      if (p) setDeployment({ projectId: p.id, projectName: p.name, sample: p.sample !== false });
+      if (!p) return;
+      const next = { projectId: p.id, projectName: p.name, sample: p.sample !== false };
+      const changed = next.projectId !== deployment.projectId || next.sample !== deployment.sample || next.projectName !== deployment.projectName;
+      setDeployment(next); rememberDeployment();
+      if (changed && live) setDepRev((n) => n + 1);          // what was remembered is stale: redraw the screen with the truth
     }).catch(() => { setDeployment({ sample: false }); /* unknown server: show no demo content; the connection banner explains the rest */ })
       .finally(() => { if (live) { setReady(true); api.getOverview(deployment.projectId).then((o) => { if (live) setOverview(o); }).catch(() => { /* the connection banner explains it */ }); } });
     return () => { live = false; };
@@ -136,7 +143,7 @@ export function App({ client }: { client?: DataClient }) {
           onDashboards={() => setSection("dashboards")} onDashboardsNow={section === "dashboards"} />
         <ConnectionBanner problem={notif.problem} onRetry={() => void notif.refresh()} />
         <SectionTabs section={section} onNavigate={setSection} />
-        <main id="main" tabIndex={-1} className="viewport"><ErrorBoundary resetKey={section}>{ready ? view() : <section className="content"><div className="placeholder" role="status">Loading…</div></section>}</ErrorBoundary></main>
+        <main id="main" tabIndex={-1} className="viewport"><ErrorBoundary resetKey={`${section}:${depRev}`} key={depRev}>{ready || section === "dashboards" ? view() : <section className="content"><div className="placeholder" role="status" data-testid="deployment-wait">Loading…</div></section>}</ErrorBoundary></main>
       </div>
       <NotificationToasts pending={notif.state?.pending ?? []}
         onOpen={(n) => { setSection("today"); setFocusItem(n.id); void notif.ack([n.key]); }}
