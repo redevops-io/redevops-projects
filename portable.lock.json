@@ -1,0 +1,10 @@
+{
+  "pyodide": "0.27.7",
+  "packages_base": "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/",
+  "kernel": {
+    "repo": "redevops-io/agentic-os",
+    "version": "",
+    "asset": "dashboards-kernel.zip",
+    "sha256": ""
+  }
+}

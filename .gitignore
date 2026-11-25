@@ -4,3 +4,5 @@ dist/
 .DS_Store
 .vite/
 coverage/
+dist-portable/
+projects-dashboards-portable.tgz
