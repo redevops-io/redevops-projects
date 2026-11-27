@@ -3,25 +3,38 @@
 // what's connected" instead of Runtime nouns. Sidekick is global (top bar, ⌘K), not a destination.
 export type Section =
   | "today" | "dashboards" | "overview" | "missions" | "inspection" | "social" | "workflows" | "sidekick" | "attention"
-  | "discovery" | "sources" | "apps" | "activity" | "settings";
+  | "discovery" | "sources" | "apps" | "activity" | "settings" | "approvals" | "applications" | "agents";
+
+// The installed app's own sections: offered only where the app answers for them (data/desktop.ts), never on a hosted page.
+export type DesktopFeature = "approvals" | "agents" | "applications";
+export const DESKTOP_SECTIONS: Partial<Record<Section, DesktopFeature>> = { approvals: "approvals", applications: "applications", agents: "agents" };
 
 export interface Destination { id: string; label: string; icon: string; sections: Section[]; secondary?: boolean }
 
 export const DESTINATIONS: Destination[] = [
   { id: "today", label: "Today", icon: "☀", sections: ["today"] },
+  { id: "approvals", label: "Approvals", icon: "✓", sections: ["approvals"] },
+  { id: "applications", label: "Applications", icon: "▦", sections: ["applications"] },
   { id: "work", label: "Work", icon: "◈", sections: ["missions", "dashboards", "overview", "attention", "social", "discovery"] },
   { id: "activity", label: "Activity", icon: "≣", sections: ["activity"] },
   { id: "automations", label: "Automations", icon: "⟲", sections: ["workflows"] },
-  { id: "connections", label: "Connections", icon: "⧉", sections: ["apps", "sources", "inspection"] },
+  { id: "connections", label: "Connections", icon: "⧉", sections: ["apps", "agents", "sources", "inspection"] },
   { id: "settings", label: "Settings", icon: "⚙", sections: ["settings", "sidekick"], secondary: true },
 ];
 
 // the label a section carries as a tab inside its destination
 export const TAB_LABEL: Record<Section, string> = {
+  approvals: "Approvals", applications: "Applications", agents: "Agents",
   today: "Today", dashboards: "Dashboards", missions: "Missions", overview: "Summary", attention: "Attention", social: "Social",
   discovery: "Discovery", activity: "Activity", workflows: "Workflows", apps: "Apps", sources: "Data sources",
   inspection: "Deployment health", settings: "General", sidekick: "Sidekick",
 };
+
+/** The destinations as this deployment offers them: an installed app's sections only where it has that feature. */
+export function offered(features?: Partial<Record<DesktopFeature, boolean>> | null): Destination[] {
+  return DESTINATIONS.map((d) => ({ ...d, sections: d.sections.filter((s) => { const f = DESKTOP_SECTIONS[s]; return !f || !!features?.[f]; }) }))
+    .filter((d) => d.sections.length > 0);
+}
 
 export function destinationOf(section: Section): Destination {
   return DESTINATIONS.find((d) => d.sections.includes(section)) ?? DESTINATIONS[0];
