@@ -24,6 +24,10 @@ import { Sources } from "./views/Sources";
 import { Apps } from "./views/Apps";
 import { Activity } from "./views/Activity";
 import { Settings } from "./views/Settings";
+import { Approvals } from "./views/Approvals";
+import { Agents } from "./views/Agents";
+import { Applications } from "./views/Applications";
+import { defaultDesktopApi, type DesktopApi, type DesktopFeatures } from "./data/desktop";
 import { makeClient, type DataClient } from "./data/client";
 import type { ProjectOverview, SidekickContext } from "./data/types";
 import { deployment, recallDeployment, rememberDeployment, setDeployment } from "./data/deployment";
@@ -32,17 +36,30 @@ const SECTION_LABEL: Record<Section, string> = {
   today: "Today", dashboards: "Dashboards", overview: "Overview", missions: "Missions", inspection: "Deployment Inspection",
   social: "Social Intelligence", workflows: "Workflows", sidekick: "Sidekick",
   attention: "Attention", discovery: "Discovery", sources: "Sources", apps: "Apps",
-  activity: "Activity", settings: "Settings",
+  activity: "Activity", settings: "Settings", approvals: "Approvals", applications: "Applications", agents: "Agents",
 };
+const HOLDS_ITEM: Section[] = ["approvals", "applications"];
 
-export function App({ client }: { client?: DataClient }) {
+export function App({ client, desktop }: { client?: DataClient; desktop?: DesktopApi | null }) {
   const api = useMemo(() => client ?? makeClient(), [client]);
+  // The installed app: asked once whether this is one. A hosted or sample deployment does not answer, and nothing changes.
+  const desk = useMemo(() => (desktop !== undefined ? desktop : client ? null : defaultDesktopApi()), [client, desktop]);
+  const [features, setFeatures] = useState<DesktopFeatures | null | undefined>(desk ? undefined : null);
+  const [waiting, setWaiting] = useState(0);
+  useEffect(() => { let live = true; void desk?.features().then((f) => { if (live) setFeatures(f); }); return () => { live = false; }; }, [desk]);
+  useEffect(() => {
+    if (!desk || !features?.approvals) return;
+    const look = () => void desk.approvals().then((l) => setWaiting(l.waiting.length)).catch(() => { /* the screen says why */ });
+    look(); const t = setInterval(look, 10_000); return () => clearInterval(t);
+  }, [desk, features]);
   // Place comes from the URL hash (deep link / refresh), else the last place, else Today — identical in the browser and
   // the desktop shell, which just points its window at the deployment and (for deep links) sets this hash.
   const start = useMemo(() => initialRoute(typeof window === "undefined" ? "" : window.location.hash), []);
   const [section, setSectionState] = useState<Section>(start.section);
+  const [deskItem, setDeskItem] = useState<string | null>(HOLDS_ITEM.includes(start.section) ? start.item ?? null : null);
   const setSection = useCallback((s: Section, item?: string) => {
     setSectionState(s);
+    setDeskItem(HOLDS_ITEM.includes(s) ? item ?? null : null);
     if (typeof window !== "undefined") {
       const h = formatHash({ section: s, item });
       if (window.location.hash !== h) window.history.pushState(null, "", h);
@@ -94,6 +111,7 @@ export function App({ client }: { client?: DataClient }) {
       setSectionState(r.section); rememberPlace(r.section);
       setFocusItem(r.section === "today" ? r.item ?? null : null);
       if (r.section === "dashboards") setDashItem(r.item ?? null);
+      setDeskItem(HOLDS_ITEM.includes(r.section) ? r.item ?? null : null);
     };
     window.addEventListener("hashchange", onHash); window.addEventListener("popstate", onHash);
     return () => { window.removeEventListener("hashchange", onHash); window.removeEventListener("popstate", onHash); };
@@ -110,8 +128,14 @@ export function App({ client }: { client?: DataClient }) {
     ? { projectId: dashProject || deployment.projectId, section: SECTION_LABEL[section], objectRef: dashRef }
     : { projectId: deployment.projectId, section: SECTION_LABEL[section] };
 
+  const notHere = <section className="content"><div className="placeholder">{features === undefined ? "Loading…" : "This screen is part of the installed app."}</div></section>;
   function view() {
     switch (section) {
+      case "approvals": return desk && features?.approvals
+        ? <Approvals desktop={desk} item={deskItem} open={(i) => setSection("approvals", i ?? undefined)} onChanged={setWaiting} /> : notHere;
+      case "agents": return desk && features?.agents ? <Agents desktop={desk} /> : notHere;
+      case "applications": return desk && features?.applications
+        ? <Applications desktop={desk} item={deskItem} open={(i) => setSection("applications", i ?? undefined)} toApprovals={() => setSection("approvals")} /> : notHere;
       case "today": return <Today client={api} go={setSection} onCount={setTodayCount} focusItem={focusItem} onFocused={() => { setFocusItem(null); if (parseHash(window.location.hash)?.item) window.history.replaceState(null, "", formatHash({ section: "today" })); }} />;
       case "dashboards":
         return <Dashboards client={api} go={setSection} ask={askSidekick} initial={dashItem}
@@ -137,12 +161,12 @@ export function App({ client }: { client?: DataClient }) {
   return (
     <div className={`app${skOpen ? " sk-open" : ""}`}>
       <a className="skip" href="#main">Skip to content</a>
-      <Rail section={section} onNavigate={setSection} badges={{ today: notif.state?.count ?? todayCount ?? 0 }} />
+      <Rail section={section} onNavigate={setSection} features={features} badges={{ today: notif.state?.count ?? todayCount ?? 0, approvals: waiting }} />
       <div className="main">
         <Topbar project={overview?.project ?? null} onAsk={(t) => askSidekick(t, true)} onOpen={() => setSkOpen(true)}
           onDashboards={() => setSection("dashboards")} onDashboardsNow={section === "dashboards"} />
         <ConnectionBanner problem={notif.problem} onRetry={() => void notif.refresh()} />
-        <SectionTabs section={section} onNavigate={setSection} />
+        <SectionTabs section={section} onNavigate={setSection} features={features} />
         <main id="main" tabIndex={-1} className="viewport"><ErrorBoundary resetKey={`${section}:${section === "dashboards" ? 0 : depRev}`} key={section === "dashboards" ? "dashboards" : depRev}>{ready || section === "dashboards" ? view() : <section className="content"><div className="placeholder" role="status" data-testid="deployment-wait">Loading…</div></section>}</ErrorBoundary></main>
       </div>
       <NotificationToasts pending={notif.state?.pending ?? []}
